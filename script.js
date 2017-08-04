@@ -120,65 +120,65 @@ let pressure = createDoubleFBO(TEXTURE_WIDTH, TEXTURE_HEIGHT);
 let gradientSubtract = createFBO(TEXTURE_WIDTH, TEXTURE_HEIGHT);
 
 const baseVertexShader = compileShader(gl.VERTEX_SHADER, `
-	attribute vec2 aPosition;
-	varying vec2 vUv;
+    attribute vec2 aPosition;
+    varying vec2 vUv;
 
-	void main () {
-		vUv = aPosition * 0.5 + 0.5;
-		gl_Position = vec4(aPosition, 0.0, 1.0);
-	}
+    void main () {
+        vUv = aPosition * 0.5 + 0.5;
+        gl_Position = vec4(aPosition, 0.0, 1.0);
+    }
 `);
 
 const displayShader = compileShader(gl.FRAGMENT_SHADER, `
-	precision highp float;
+    precision highp float;
 
-	varying vec2 vUv;
+    varying vec2 vUv;
     uniform sampler2D uTexture;
 
-	void main () {
+    void main () {
         gl_FragColor = texture2D(uTexture, vUv);
-	}
+    }
 `);
 
 const testShader = compileShader(gl.FRAGMENT_SHADER, `
-	precision highp float;
+    precision highp float;
 
-	varying vec2 vUv;
+    varying vec2 vUv;
     uniform sampler2D uTexture;
     uniform vec2 uMouse;
 
-	void main () {
-		vec4 color = texture2D(uTexture, vUv);
+    void main () {
+        vec4 color = texture2D(uTexture, vUv);
         // gl_FragColor = vec4(vUv.xy, uMouse.x, 1.0);// + color;
         gl_FragColor = color + vec4(0.0, 0.005, 0.0, 0.0);
-	}
+    }
 `);
 
 const initDensityShader = compileShader(gl.FRAGMENT_SHADER, `
-	precision highp float;
+    precision highp float;
 
-	varying vec2 vUv;
+    varying vec2 vUv;
 
-	void main () {
+    void main () {
         float d = mod(floor(vUv.x * 10.0) + floor(vUv.y * 10.0), 2.0);
         gl_FragColor = vec4(vec3(d), 1.0);
-	}
+    }
 `);
 
 const initVelocityShader = compileShader(gl.FRAGMENT_SHADER, `
-	precision highp float;
+    precision highp float;
 
-	varying vec2 vUv;
+    varying vec2 vUv;
 
-	void main () {
+    void main () {
         gl_FragColor = vec4(sin(6.28 * vUv.y), sin(6.28 * vUv.x), 0.0, 1.0);
-	}
+    }
 `);
 
 const advectionShader = compileShader(gl.FRAGMENT_SHADER, `
-	precision highp float;
+    precision highp float;
 
-	varying vec2 vUv;
+    varying vec2 vUv;
     uniform sampler2D uVelocity;
     uniform sampler2D uSource;
     uniform vec2 wh_inv;
@@ -186,23 +186,23 @@ const advectionShader = compileShader(gl.FRAGMENT_SHADER, `
     uniform float rdx;
     uniform float dissipation;
 
-	void main () {
+    void main () {
         vec2 velocity = texture2D(uVelocity, vUv).xy;
         vec2 back_pos = vUv - dt * rdx * velocity * wh_inv;
         gl_FragColor = dissipation * texture2D(uSource, back_pos);
         gl_FragColor.a = 1.0;
-	}
+    }
 `);
 
 const divergenceShader = compileShader(gl.FRAGMENT_SHADER, `
-	precision highp float;
+    precision highp float;
 
-	varying vec2 vUv;
+    varying vec2 vUv;
     uniform sampler2D uVelocity;
     uniform vec2 wh_inv;
     uniform float halfrdx;
 
-	void main () {
+    void main () {
         vec2 T = texture2D(uVelocity, vUv + vec2(0.0, wh_inv.y)).xy;
         vec2 B = texture2D(uVelocity, vUv - vec2(0.0, wh_inv.y)).xy;
         vec2 R = texture2D(uVelocity, vUv + vec2(wh_inv.x, 0.0)).xy;
@@ -210,19 +210,19 @@ const divergenceShader = compileShader(gl.FRAGMENT_SHADER, `
         //vec2 C = texture2D(uVelocity, vUv).xy;
         float div = halfrdx * ((R.x - L.x) + (T.y - B.y));
         gl_FragColor = vec4(div, 0.0, 0.0, 1.0);
-	}
+    }
 `);
 
 const pressureShader = compileShader(gl.FRAGMENT_SHADER, `
-	precision highp float;
+    precision highp float;
 
-	varying vec2 vUv;
+    varying vec2 vUv;
     uniform sampler2D uPressure;
     uniform sampler2D uDivergence;
     uniform vec2 wh_inv;
     uniform float alpha;
 
-	void main () {
+    void main () {
         float T = texture2D(uPressure, vUv + vec2(0.0, wh_inv.y)).x;
         float B = texture2D(uPressure, vUv - vec2(0.0, wh_inv.y)).x;
         float R = texture2D(uPressure, vUv + vec2(wh_inv.x, 0.0)).x;
@@ -230,21 +230,21 @@ const pressureShader = compileShader(gl.FRAGMENT_SHADER, `
 
         float divergence = texture2D(uDivergence, vUv).x;
         float pressure = (L + R + B + T + alpha * divergence) * .25;
-        
+
         gl_FragColor = vec4(pressure, 0.0, 0.0, 1.0);
-	}
+    }
 `);
 
 const gradientSubtractShader = compileShader(gl.FRAGMENT_SHADER, `
-	precision highp float;
+    precision highp float;
 
-	varying vec2 vUv;
+    varying vec2 vUv;
     uniform sampler2D uPressure;
     uniform sampler2D uVelocity;
     uniform vec2 wh_inv;
     uniform float halfrdx;
 
-	void main () {
+    void main () {
         float T = texture2D(uPressure, vUv + vec2(0.0, wh_inv.y)).x;
         float B = texture2D(uPressure, vUv - vec2(0.0, wh_inv.y)).x;
         float R = texture2D(uPressure, vUv + vec2(wh_inv.x, 0.0)).x;
@@ -252,9 +252,9 @@ const gradientSubtractShader = compileShader(gl.FRAGMENT_SHADER, `
 
         vec2 velocity = texture2D(uVelocity, vUv).xy;
         vec2 result = velocity - halfrdx * vec2(R - L, T - B);
-        
+
         gl_FragColor = vec4(result, 0.0, 1.0);
-	}
+    }
 `);
 
 const displayProgram = new GLProgram(baseVertexShader, displayShader);
@@ -288,7 +288,7 @@ function Update () {
     gl.bindTexture(gl.TEXTURE_2D, velocity.first[0]);
     gl.activeTexture(gl.TEXTURE0 + 1);
     gl.bindTexture(gl.TEXTURE_2D, density.first[0]);
-    
+
     // advect density
     advectionProgram.bind();
     gl.uniform1i(advectionProgram.uniforms.uVelocity, 0);
@@ -356,11 +356,11 @@ function Update () {
 }
 
 function resizeCanvas () {
-	if (canvas.width != canvas.clientWidth || canvas.height != canvas.clientHeight) {
-		const displayHeight = canvas.clientHeight;
-		canvas.width = canvas.clientWidth;
-		canvas.height = displayHeight;
-	}
+    if (canvas.width != canvas.clientWidth || canvas.height != canvas.clientHeight) {
+        const displayHeight = canvas.clientHeight;
+        canvas.width = canvas.clientWidth;
+        canvas.height = displayHeight;
+    }
 }
 
 window.addEventListener('mousemove', (e) => {
