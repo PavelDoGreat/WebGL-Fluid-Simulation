@@ -2,7 +2,7 @@
 'use strict';
 
 const canvas = document.getElementsByTagName('canvas')[0];
-const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+const gl = canvas.getContext('webgl', { alpha: false });
 
 if (!gl.getExtension("OES_texture_float")) {
    console.log("does not support OES_texture_float");
@@ -13,6 +13,9 @@ if (!gl.getExtension("OES_texture_float_linear")) {
 }
 
 resizeCanvas();
+
+const TEXTURE_WIDTH = gl.drawingBufferWidth;
+const TEXTURE_HEIGHT = gl.drawingBufferHeight;
 
 class GLProgram {
     constructor (vertexShader, fragmentShader) {
@@ -58,27 +61,38 @@ function createFBO (width, height) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
-    const texData = new Uint8Array([
-    	238, 95, 64, 255,
-    	85, 74, 32, 255,
-    	86, 39, 95, 255,
-    	75, 37, 37, 255
-    ]);
-
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.FLOAT, null);
 
     var fbo = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+    gl.viewport(0, 0, width, height);
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     return [texture, fbo];
 }
 
-const blit = ((source, destination) => {
+function createDoubleFBO (width, height) {
+    let fbo1 = createFBO(width, height);
+    let fbo2 = createFBO(width, height);
+
+    return {
+        get first() {
+            return fbo1;
+        },
+        get second () {
+            return fbo2;
+        },
+        swap: () => {
+            let temp = fbo1;
+            fbo1 = fbo2;
+            fbo2 = temp;
+        }
+    }
+}
+
+const blit = (() => {
     gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, -1, 1, 1, 1, 1, -1]), gl.STATIC_DRAW);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer());
@@ -87,19 +101,16 @@ const blit = ((source, destination) => {
     gl.enableVertexAttribArray(0);
 
     return (destination) => {
-        // gl.bindTexture(gl.TEXTURE_2D, source === null ? null : source[0]);
         gl.bindFramebuffer(gl.FRAMEBUFFER, destination);
         gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
     }
 })();
 
-let source = createFBO(gl.drawingBufferWidth, gl.drawingBufferHeight);
-let source2 = createFBO(gl.drawingBufferWidth, gl.drawingBufferHeight);
-let velocity = createFBO(gl.drawingBufferWidth, gl.drawingBufferHeight);
-let velocity2 = createFBO(gl.drawingBufferWidth, gl.drawingBufferHeight);
-let divergence = createFBO(gl.drawingBufferWidth, gl.drawingBufferHeight);
+let density = createDoubleFBO(TEXTURE_WIDTH, TEXTURE_HEIGHT);
+let velocity = createDoubleFBO(TEXTURE_WIDTH, TEXTURE_HEIGHT);
+let divergence = createFBO(TEXTURE_WIDTH, TEXTURE_HEIGHT);
 
-const vertexShader = compileShader(gl.VERTEX_SHADER, `
+const baseVertexShader = compileShader(gl.VERTEX_SHADER, `
 	attribute vec2 aPosition;
 	varying vec2 vUv;
 
@@ -109,7 +120,7 @@ const vertexShader = compileShader(gl.VERTEX_SHADER, `
 	}
 `);
 
-const simpleFragmentShader = compileShader(gl.FRAGMENT_SHADER, `
+const displayShader = compileShader(gl.FRAGMENT_SHADER, `
 	precision highp float;
 
 	varying vec2 vUv;
@@ -120,7 +131,7 @@ const simpleFragmentShader = compileShader(gl.FRAGMENT_SHADER, `
 	}
 `);
 
-const simulationFragmentShader = compileShader(gl.FRAGMENT_SHADER, `
+const testShader = compileShader(gl.FRAGMENT_SHADER, `
 	precision highp float;
 
 	varying vec2 vUv;
@@ -134,7 +145,7 @@ const simulationFragmentShader = compileShader(gl.FRAGMENT_SHADER, `
 	}
 `);
 
-const initSourceShader = compileShader(gl.FRAGMENT_SHADER, `
+const initDensityShader = compileShader(gl.FRAGMENT_SHADER, `
 	precision highp float;
 
 	varying vec2 vUv;
@@ -237,12 +248,12 @@ const gradientSubtractShader = compileShader(gl.FRAGMENT_SHADER, `
 	}
 `);
 
-const simpleProgram = new GLProgram(vertexShader, simpleFragmentShader);
-const simulationProgram = new GLProgram(vertexShader, simulationFragmentShader);
-const initSourceProgram = new GLProgram(vertexShader, initSourceShader);
-const initVelocityProgram = new GLProgram(vertexShader, initVelocityShader);
-const advectionProgram = new GLProgram(vertexShader, advectionShader);
-const divergenceProgram = new GLProgram(vertexShader, divergenceShader);
+const displayProgram = new GLProgram(baseVertexShader, displayShader);
+const testProgram = new GLProgram(baseVertexShader, testShader);
+const initDensityProgram = new GLProgram(baseVertexShader, initDensityShader);
+const initVelocityProgram = new GLProgram(baseVertexShader, initVelocityShader);
+const advectionProgram = new GLProgram(baseVertexShader, advectionShader);
+const divergenceProgram = new GLProgram(baseVertexShader, divergenceShader);
 
 let pointer = {
     x: 0,
@@ -250,73 +261,54 @@ let pointer = {
 }
 
 gl.bindTexture(gl.TEXTURE_2D, null);
-initSourceProgram.bind();
-blit(source[1]);
+initDensityProgram.bind();
+blit(density.first[1]);
 initVelocityProgram.bind();
-blit(velocity[1]);
+blit(velocity.first[1]);
 
 Update();
-
-function advect (target, dt) {
-    gl.activeTexture(gl.TEXTURE0 + 0);
-    gl.bindTexture(gl.TEXTURE_2D, velocity[0]);
-    gl.activeTexture(gl.TEXTURE0 + 1);
-    gl.bindTexture(gl.TEXTURE_2D, source[0]);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, target[1]);
-
-    advectionProgram.bind();
-    gl.uniform1i(advectionProgram.uniforms.uVelocity, 0);
-    gl.uniform1i(advectionProgram.uniforms.uSource, 1);
-    gl.uniform2f(advectionProgram.uniforms.wh_inv, 1.0 / canvas.clientWidth, 1.0 / canvas.clientHeight);
-    gl.uniform1f(advectionProgram.uniforms.dt, dt);
-    gl.uniform1f(advectionProgram.uniforms.rdx, 1.0);
-    gl.uniform1f(advectionProgram.uniforms.dissipation, 1.0);
-    gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
-}
 
 function Update () {
     resizeCanvas();
 
-    // advect(source, 1.0);
+
+    gl.viewport(0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
 
     gl.activeTexture(gl.TEXTURE0 + 0);
-    gl.bindTexture(gl.TEXTURE_2D, velocity[0]);
+    gl.bindTexture(gl.TEXTURE_2D, velocity.first[0]);
     gl.activeTexture(gl.TEXTURE0 + 1);
-    gl.bindTexture(gl.TEXTURE_2D, source[0]);
-        
+    gl.bindTexture(gl.TEXTURE_2D, density.first[0]);
+    
+    // advect
     advectionProgram.bind();
     gl.uniform1i(advectionProgram.uniforms.uVelocity, 0);
     gl.uniform1i(advectionProgram.uniforms.uSource, 1);
-    gl.uniform2f(advectionProgram.uniforms.wh_inv, 1.0 / canvas.clientWidth, 1.0 / canvas.clientHeight);
+    gl.uniform2f(advectionProgram.uniforms.wh_inv, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
     gl.uniform1f(advectionProgram.uniforms.dt, 1.0);
     gl.uniform1f(advectionProgram.uniforms.rdx, 1.0);
     gl.uniform1f(advectionProgram.uniforms.dissipation, 1.0);
-    blit(source2[1]);
+    blit(density.second[1]);
     
-    // gl.activeTexture(gl.TEXTURE0 + 1);
-    // gl.bindTexture(gl.TEXTURE_2D, velocity[0]);
-    // blit(velocity2[1]);
+    gl.activeTexture(gl.TEXTURE0 + 1);
+    gl.bindTexture(gl.TEXTURE_2D, velocity.first[0]);
+    blit(velocity.second[1]);
 
     gl.activeTexture(gl.TEXTURE0 + 0);
-    gl.bindTexture(gl.TEXTURE_2D, velocity2[0]);
+    gl.bindTexture(gl.TEXTURE_2D, velocity.second[0]);
     divergenceProgram.bind();
     gl.uniform1i(divergenceProgram.uniforms.uVelocity, 0);
-    gl.uniform2f(divergenceProgram.uniforms.wh_inv, 1.0 / canvas.clientWidth, 1.0 / canvas.clientHeight);
+    gl.uniform2f(divergenceProgram.uniforms.wh_inv, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
     gl.uniform1f(divergenceProgram.uniforms.halfrdx, 0.5);
     blit(divergence[1]);
 
+    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
     gl.activeTexture(gl.TEXTURE0 + 0);
-    gl.bindTexture(gl.TEXTURE_2D, source[0]);
-    simpleProgram.bind();
+    gl.bindTexture(gl.TEXTURE_2D, density.first[0]);
+    displayProgram.bind();
     blit(null);
 
-    let temp = source2;
-    source2 = source;
-    source = temp;
-
-    temp = velocity2;
-    velocity2 = velocity;
-    velocity = temp;
+    density.swap();
+    velocity.swap();
 
     requestAnimationFrame(Update);
 }
