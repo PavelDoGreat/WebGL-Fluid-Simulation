@@ -16,7 +16,7 @@ resizeCanvas();
 
 const TEXTURE_WIDTH = gl.drawingBufferWidth;
 const TEXTURE_HEIGHT = gl.drawingBufferHeight;
-const CELL_SIZE = 1;
+const CELL_SIZE = 1.25;
 
 class GLProgram {
     constructor (vertexShader, fragmentShader) {
@@ -163,12 +163,12 @@ const initDensityShader = compileShader(gl.FRAGMENT_SHADER, `
     varying vec2 vUv;
 
     void main () {
-        //float d = mod(floor(vUv.x * 10.0) + floor(vUv.y * 10.0), 2.0);
-        vec2 p = vec2(0.5, 0.2);
-        float d = length(vUv - p);
-        float radius = 0.1;
-        float c = smoothstep(radius - .01, radius + .01, d);
-        gl_FragColor = vec4(vec3(c * 1000.0), 1.0);
+        float d = mod(floor(vUv.x * 10.0) + floor(vUv.y * 10.0), 2.0);
+        // vec2 p = vec2(0.5, 0.2);
+        // float d = length(vUv - p);
+        // float radius = 0.1;
+        // float c = smoothstep(radius - .01, radius + .01, d);
+        gl_FragColor = vec4(vec3(d), 1.0);
     }
 `);
 
@@ -190,12 +190,11 @@ const advectionShader = compileShader(gl.FRAGMENT_SHADER, `
     uniform sampler2D uSource;
     uniform vec2 wh_inv;
     uniform float dt;
-    uniform float rdx;
     uniform float dissipation;
 
     void main () {
         vec2 velocity = texture2D(uVelocity, vUv).xy;
-        vec2 coord = vUv - dt * rdx * velocity * wh_inv;
+        vec2 coord = vUv - dt * velocity * wh_inv;
         gl_FragColor = dissipation * texture2D(uSource, coord);
         gl_FragColor.a = 1.0;
     }
@@ -278,7 +277,6 @@ let pointer = {
     y: 0
 }
 
-// gl.bindTexture(gl.TEXTURE_2D, null);
 initDensityProgram.bind();
 blit(density.first[1]);
 initVelocityProgram.bind();
@@ -290,27 +288,37 @@ function Update () {
     resizeCanvas();
 
     gl.viewport(0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
+    
+    // advect velocity
+    advectionProgram.bind();
+    gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.first[2]);
+    gl.uniform1i(advectionProgram.uniforms.uSource, velocity.first[2]);
+    gl.uniform2f(advectionProgram.uniforms.wh_inv, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
+    gl.uniform1f(advectionProgram.uniforms.dt, 0.125);
+    gl.uniform1f(advectionProgram.uniforms.dissipation, 1.0);
+    blit(velocity.second[1]);
+    velocity.swap();
 
     // advect density
-    advectionProgram.bind();
+    // advectionProgram.bind();
     gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.first[2]);
     gl.uniform1i(advectionProgram.uniforms.uSource, density.first[2]);
     gl.uniform2f(advectionProgram.uniforms.wh_inv, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
-    gl.uniform1f(advectionProgram.uniforms.dt, 1.0);
-    gl.uniform1f(advectionProgram.uniforms.rdx, 1 / CELL_SIZE);
+    gl.uniform1f(advectionProgram.uniforms.dt, 0.125);
     gl.uniform1f(advectionProgram.uniforms.dissipation, 1.0);
     blit(density.second[1]);
+    density.swap();
 
     // calculate divergence
     divergenceProgram.bind();
     gl.uniform1i(divergenceProgram.uniforms.uVelocity, velocity.first[2]);
     gl.uniform2f(divergenceProgram.uniforms.wh_inv, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
-    gl.uniform1f(divergenceProgram.uniforms.halfrdx, 0.5 * (1 / CELL_SIZE));
+    gl.uniform1f(divergenceProgram.uniforms.halfrdx, 0.5 / CELL_SIZE);
     blit(divergence[1]);
 
     // pressure
     clear(pressure.first[1]);
-    clear(pressure.second[1]);
+    // clear(pressure.second[1]);
     pressureProgram.bind();
     gl.uniform1i(pressureProgram.uniforms.uDivergence, divergence[2]);
     gl.uniform2f(pressureProgram.uniforms.wh_inv, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
@@ -322,40 +330,19 @@ function Update () {
     }
 
     // subtract gradient
-    // gl.activeTexture(gl.TEXTURE0 + 0);
-    // gl.bindTexture(gl.TEXTURE_2D, pressure.second[0]);
-    // gl.activeTexture(gl.TEXTURE0 + 1);
-    // gl.bindTexture(gl.TEXTURE_2D, velocity.first[0]);
     gradienSubtractProgram.bind();
     gl.uniform1i(gradienSubtractProgram.uniforms.uPressure, pressure.first[2]);
     gl.uniform1i(gradienSubtractProgram.uniforms.uVelocity, velocity.first[2]);
     gl.uniform2f(gradienSubtractProgram.uniforms.wh_inv, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
-    gl.uniform1f(gradienSubtractProgram.uniforms.halfrdx, 0.5 * (1 / CELL_SIZE));
+    gl.uniform1f(gradienSubtractProgram.uniforms.halfrdx, 1.125 / CELL_SIZE);
     blit(velocity.second[1]);
-
-    // advect velocity
-    // gl.activeTexture(gl.TEXTURE0 + 1);
-    // gl.bindTexture(gl.TEXTURE_2D, velocity.second[0]);
-    // blit(velocity.first[1]);
-    advectionProgram.bind();
-    gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.second[2]);
-    gl.uniform1i(advectionProgram.uniforms.uSource, velocity.second[2]);
-    gl.uniform2f(advectionProgram.uniforms.wh_inv, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
-    gl.uniform1f(advectionProgram.uniforms.dt, 1.0);
-    gl.uniform1f(advectionProgram.uniforms.rdx, 1 / CELL_SIZE);
-    gl.uniform1f(advectionProgram.uniforms.dissipation, 1.0);
-    blit(velocity.first[1]);
+    velocity.swap();
 
     // display result
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-    // gl.activeTexture(gl.TEXTURE0 + 0);
-    // gl.bindTexture(gl.TEXTURE_2D, density.first[0]);
     displayProgram.bind();
     gl.uniform1i(displayProgram.uniforms.uTexture, density.first[2]);
     blit(null);
-
-    density.swap();
-    velocity.swap();
 
     requestAnimationFrame(Update);
 }
