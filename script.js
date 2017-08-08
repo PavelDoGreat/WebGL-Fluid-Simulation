@@ -188,7 +188,7 @@ const advectionShader = compileShader(gl.FRAGMENT_SHADER, `
     varying vec2 vUv;
     uniform sampler2D uVelocity;
     uniform sampler2D uSource;
-    uniform vec2 wh_inv;
+    uniform vec2 texelSize;
     uniform float rdx;
     uniform float dt;
     uniform float dissipation;
@@ -197,7 +197,7 @@ const advectionShader = compileShader(gl.FRAGMENT_SHADER, `
 
     vec4 bilerp (sampler2D sam, vec2 p)
     {
-        vec2 res = 1.0 / wh_inv.xy;
+        vec2 res = 1.0 / texelSize.xy;
         // vec2 st = p * res - 0.5;
         // vec2 iuv = floor(st);
         // vec2 fuv = fract(st);
@@ -231,14 +231,14 @@ const divergenceShader = compileShader(gl.FRAGMENT_SHADER, `
 
     varying vec2 vUv;
     uniform sampler2D uVelocity;
-    uniform vec2 wh_inv;
+    uniform vec2 texelSize;
     uniform float halfrdx;
 
     void main () {
-        vec2 T = texture2D(uVelocity, vUv + vec2(0.0, wh_inv.y)).xy;
-        vec2 B = texture2D(uVelocity, vUv - vec2(0.0, wh_inv.y)).xy;
-        vec2 R = texture2D(uVelocity, vUv + vec2(wh_inv.x, 0.0)).xy;
-        vec2 L = texture2D(uVelocity, vUv - vec2(wh_inv.x, 0.0)).xy;
+        vec2 T = texture2D(uVelocity, vUv + vec2(0.0, texelSize.y)).xy;
+        vec2 B = texture2D(uVelocity, vUv - vec2(0.0, texelSize.y)).xy;
+        vec2 R = texture2D(uVelocity, vUv + vec2(texelSize.x, 0.0)).xy;
+        vec2 L = texture2D(uVelocity, vUv - vec2(texelSize.x, 0.0)).xy;
         //vec2 C = texture2D(uVelocity, vUv).xy;
         float div = halfrdx * (R.x - L.x + T.y - B.y);
         gl_FragColor = vec4(div, 0.0, 0.0, 1.0);
@@ -251,14 +251,14 @@ const pressureShader = compileShader(gl.FRAGMENT_SHADER, `
     varying vec2 vUv;
     uniform sampler2D uPressure;
     uniform sampler2D uDivergence;
-    uniform vec2 wh_inv;
+    uniform vec2 texelSize;
     uniform float alpha;
 
     void main () {
-        float T = texture2D(uPressure, vUv + vec2(0.0, wh_inv.y)).x;
-        float B = texture2D(uPressure, vUv - vec2(0.0, wh_inv.y)).x;
-        float R = texture2D(uPressure, vUv + vec2(wh_inv.x, 0.0)).x;
-        float L = texture2D(uPressure, vUv - vec2(wh_inv.x, 0.0)).x;
+        float T = texture2D(uPressure, vUv + vec2(0.0, texelSize.y)).x;
+        float B = texture2D(uPressure, vUv - vec2(0.0, texelSize.y)).x;
+        float R = texture2D(uPressure, vUv + vec2(texelSize.x, 0.0)).x;
+        float L = texture2D(uPressure, vUv - vec2(texelSize.x, 0.0)).x;
 
         float divergence = texture2D(uDivergence, vUv).x;
         float pressure = (L + R + B + T + alpha * divergence) * .25;
@@ -272,14 +272,14 @@ const gradientSubtractShader = compileShader(gl.FRAGMENT_SHADER, `
     varying vec2 vUv;
     uniform sampler2D uPressure;
     uniform sampler2D uVelocity;
-    uniform vec2 wh_inv;
+    uniform vec2 texelSize;
     uniform float halfrdx;
 
     void main () {
-        float T = texture2D(uPressure, vUv + vec2(0.0, wh_inv.y)).x;
-        float B = texture2D(uPressure, vUv - vec2(0.0, wh_inv.y)).x;
-        float R = texture2D(uPressure, vUv + vec2(wh_inv.x, 0.0)).x;
-        float L = texture2D(uPressure, vUv - vec2(wh_inv.x, 0.0)).x;
+        float T = texture2D(uPressure, vUv + vec2(0.0, texelSize.y)).x;
+        float B = texture2D(uPressure, vUv - vec2(0.0, texelSize.y)).x;
+        float R = texture2D(uPressure, vUv + vec2(texelSize.x, 0.0)).x;
+        float L = texture2D(uPressure, vUv - vec2(texelSize.x, 0.0)).x;
 
         vec2 velocity = texture2D(uVelocity, vUv).xy;
         velocity.xy -= halfrdx * vec2(R - L, T - B);
@@ -319,7 +319,7 @@ function Update () {
     advectionProgram.bind();
     gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.first[2]);
     gl.uniform1i(advectionProgram.uniforms.uSource, velocity.first[2]);
-    gl.uniform2f(advectionProgram.uniforms.wh_inv, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
+    gl.uniform2f(advectionProgram.uniforms.texelSize, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
     gl.uniform1f(advectionProgram.uniforms.rdx, 1.0 / CELL_SIZE);
     gl.uniform1f(advectionProgram.uniforms.dt, 0.16);
     gl.uniform1f(advectionProgram.uniforms.dissipation, 1.0);
@@ -336,8 +336,8 @@ function Update () {
     // calculate divergence
     divergenceProgram.bind();
     gl.uniform1i(divergenceProgram.uniforms.uVelocity, velocity.first[2]);
-    gl.uniform2f(divergenceProgram.uniforms.wh_inv, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
-    gl.uniform1f(divergenceProgram.uniforms.halfrdx, 0.5 * CELL_SIZE);
+    gl.uniform2f(divergenceProgram.uniforms.texelSize, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
+    gl.uniform1f(divergenceProgram.uniforms.halfrdx, 0.5 / CELL_SIZE);
     blit(divergence[1]);
 
     // pressure
@@ -345,7 +345,7 @@ function Update () {
     // clear(pressure.second[1]);
     pressureProgram.bind();
     gl.uniform1i(pressureProgram.uniforms.uDivergence, divergence[2]);
-    gl.uniform2f(pressureProgram.uniforms.wh_inv, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
+    gl.uniform2f(pressureProgram.uniforms.texelSize, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
     gl.uniform1f(pressureProgram.uniforms.alpha, -CELL_SIZE * CELL_SIZE);
     for (let i = 0; i < 10; i++) {
         gl.uniform1i(pressureProgram.uniforms.uPressure, pressure.first[2]);
@@ -357,8 +357,8 @@ function Update () {
     gradienSubtractProgram.bind();
     gl.uniform1i(gradienSubtractProgram.uniforms.uPressure, pressure.first[2]);
     gl.uniform1i(gradienSubtractProgram.uniforms.uVelocity, velocity.first[2]);
-    gl.uniform2f(gradienSubtractProgram.uniforms.wh_inv, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
-    gl.uniform1f(gradienSubtractProgram.uniforms.halfrdx, 0.5 * CELL_SIZE);
+    gl.uniform2f(gradienSubtractProgram.uniforms.texelSize, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
+    gl.uniform1f(gradienSubtractProgram.uniforms.halfrdx, 0.5 / CELL_SIZE);
     blit(velocity.second[1]);
     velocity.swap();
 
