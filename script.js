@@ -2,7 +2,7 @@
 'use strict';
 
 const canvas = document.getElementsByTagName('canvas')[0];
-const gl = canvas.getContext('webgl', { alpha: false });
+const gl = canvas.getContext('webgl', { alpha: false, preserveDrawingBuffer: true });
 
 if (!gl.getExtension("OES_texture_float")) {
    console.log("does not support OES_texture_float");
@@ -14,9 +14,9 @@ if (!gl.getExtension("OES_texture_float_linear")) {
 
 resizeCanvas();
 
-const TEXTURE_WIDTH = gl.drawingBufferWidth;
-const TEXTURE_HEIGHT = gl.drawingBufferHeight;
-const CELL_SIZE = 1.25;
+const TEXTURE_WIDTH = 240//gl.drawingBufferWidth;
+const TEXTURE_HEIGHT = 427//gl.drawingBufferHeight;
+const CELL_SIZE = 1.0;
 
 class GLProgram {
     constructor (vertexShader, fragmentShader) {
@@ -192,10 +192,28 @@ const advectionShader = compileShader(gl.FRAGMENT_SHADER, `
     uniform float dt;
     uniform float dissipation;
 
+    vec4 bilerp (sampler2D sam, vec2 p)
+    {
+        vec2 res = 1.0 / wh_inv.xy;
+        // vec2 st = p * res - 0.5;
+        // vec2 iuv = floor(st);
+        // vec2 fuv = fract(st);
+       
+        vec2 f = p - floor(p);
+        p = floor(p);
+        vec4 a = texture2D(sam, p);
+        vec4 b = texture2D(sam, p + vec2(wh_inv.x, 0.0));
+        vec4 c = texture2D(sam, p + vec2(0.0, wh_inv.y));
+        vec4 d = texture2D(sam, p + wh_inv.xy);
+        
+        
+        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+    }
+
     void main () {
         vec2 velocity = texture2D(uVelocity, vUv).xy;
         vec2 coord = vUv - dt * velocity * wh_inv;
-        gl_FragColor = dissipation * texture2D(uSource, coord);
+        gl_FragColor = dissipation * bilerp(uSource, coord);
         gl_FragColor.a = 1.0;
     }
 `);
@@ -294,17 +312,14 @@ function Update () {
     gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.first[2]);
     gl.uniform1i(advectionProgram.uniforms.uSource, velocity.first[2]);
     gl.uniform2f(advectionProgram.uniforms.wh_inv, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
-    gl.uniform1f(advectionProgram.uniforms.dt, 0.125);
+    gl.uniform1f(advectionProgram.uniforms.dt, 0.016);
     gl.uniform1f(advectionProgram.uniforms.dissipation, 1.0);
     blit(velocity.second[1]);
     velocity.swap();
 
     // advect density
-    // advectionProgram.bind();
     gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.first[2]);
     gl.uniform1i(advectionProgram.uniforms.uSource, density.first[2]);
-    gl.uniform2f(advectionProgram.uniforms.wh_inv, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
-    gl.uniform1f(advectionProgram.uniforms.dt, 0.125);
     gl.uniform1f(advectionProgram.uniforms.dissipation, 1.0);
     blit(density.second[1]);
     density.swap();
@@ -313,7 +328,7 @@ function Update () {
     divergenceProgram.bind();
     gl.uniform1i(divergenceProgram.uniforms.uVelocity, velocity.first[2]);
     gl.uniform2f(divergenceProgram.uniforms.wh_inv, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
-    gl.uniform1f(divergenceProgram.uniforms.halfrdx, 0.5 / CELL_SIZE);
+    gl.uniform1f(divergenceProgram.uniforms.halfrdx, 0.5 * CELL_SIZE);
     blit(divergence[1]);
 
     // pressure
@@ -323,7 +338,7 @@ function Update () {
     gl.uniform1i(pressureProgram.uniforms.uDivergence, divergence[2]);
     gl.uniform2f(pressureProgram.uniforms.wh_inv, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
     gl.uniform1f(pressureProgram.uniforms.alpha, -CELL_SIZE * CELL_SIZE);
-    for (let i = 0; i < 1; i++) {
+    for (let i = 0; i < 10; i++) {
         gl.uniform1i(pressureProgram.uniforms.uPressure, pressure.first[2]);
         blit(pressure.second[1]);
         pressure.swap();
@@ -334,7 +349,7 @@ function Update () {
     gl.uniform1i(gradienSubtractProgram.uniforms.uPressure, pressure.first[2]);
     gl.uniform1i(gradienSubtractProgram.uniforms.uVelocity, velocity.first[2]);
     gl.uniform2f(gradienSubtractProgram.uniforms.wh_inv, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
-    gl.uniform1f(gradienSubtractProgram.uniforms.halfrdx, 1.125 / CELL_SIZE);
+    gl.uniform1f(gradienSubtractProgram.uniforms.halfrdx, 0.5 * CELL_SIZE);
     blit(velocity.second[1]);
     velocity.swap();
 
