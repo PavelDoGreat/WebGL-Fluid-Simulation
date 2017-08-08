@@ -14,8 +14,8 @@ if (!gl.getExtension("OES_texture_float_linear")) {
 
 resizeCanvas();
 
-const TEXTURE_WIDTH = 240//gl.drawingBufferWidth;
-const TEXTURE_HEIGHT = 427//gl.drawingBufferHeight;
+const TEXTURE_WIDTH = gl.drawingBufferWidth;
+const TEXTURE_HEIGHT = gl.drawingBufferHeight;
 const CELL_SIZE = 1.0;
 
 class GLProgram {
@@ -189,6 +189,7 @@ const advectionShader = compileShader(gl.FRAGMENT_SHADER, `
     uniform sampler2D uVelocity;
     uniform sampler2D uSource;
     uniform vec2 wh_inv;
+    uniform float rdx;
     uniform float dt;
     uniform float dissipation;
 
@@ -219,7 +220,7 @@ const advectionShader = compileShader(gl.FRAGMENT_SHADER, `
 
     void main () {
         vec2 velocity = texture2D(uVelocity, vUv).xy;
-        vec2 coord = vUv - dt * velocity * wh_inv;
+        vec2 coord = gl_FragCoord.xy - rdx * dt * velocity;
         gl_FragColor = dissipation * bilerp(uSource, coord);
         gl_FragColor.a = 1.0;
     }
@@ -319,7 +320,8 @@ function Update () {
     gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.first[2]);
     gl.uniform1i(advectionProgram.uniforms.uSource, velocity.first[2]);
     gl.uniform2f(advectionProgram.uniforms.wh_inv, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
-    gl.uniform1f(advectionProgram.uniforms.dt, 0.016);
+    gl.uniform1f(advectionProgram.uniforms.rdx, 1.0 / CELL_SIZE);
+    gl.uniform1f(advectionProgram.uniforms.dt, 0.16);
     gl.uniform1f(advectionProgram.uniforms.dissipation, 1.0);
     blit(velocity.second[1]);
     velocity.swap();
