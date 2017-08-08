@@ -192,21 +192,28 @@ const advectionShader = compileShader(gl.FRAGMENT_SHADER, `
     uniform float dt;
     uniform float dissipation;
 
+    // https://github.com/mharrys/fluids-2d/blob/master/shaders/advect.fs
+
     vec4 bilerp (sampler2D sam, vec2 p)
     {
         vec2 res = 1.0 / wh_inv.xy;
         // vec2 st = p * res - 0.5;
         // vec2 iuv = floor(st);
         // vec2 fuv = fract(st);
+
+        vec4 st;
+        st.xy = floor(p - 0.5) + 0.5;
+        st.zw = st.xy + 1.0;
+        vec4 uv = st / res.xyxy;
        
-        vec2 f = p - floor(p);
-        p = floor(p);
-        vec4 a = texture2D(sam, p);
-        vec4 b = texture2D(sam, p + vec2(wh_inv.x, 0.0));
-        vec4 c = texture2D(sam, p + vec2(0.0, wh_inv.y));
-        vec4 d = texture2D(sam, p + wh_inv.xy);
+        // vec2 f = p - floor(p);
+        // p = floor(p);
+        vec4 a = texture2D(sam, uv.xy);
+        vec4 b = texture2D(sam, uv.zy);
+        vec4 c = texture2D(sam, uv.xw);
+        vec4 d = texture2D(sam, uv.zw);
         
-        
+        vec2 f = p - st.xy;
         return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
     }
 
