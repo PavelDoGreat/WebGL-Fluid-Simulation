@@ -16,8 +16,8 @@ if (!support_linear_float) {
 resizeCanvas();
 
 const TEXTURE_DOWNSAMPLE = 2;
-const TEXTURE_WIDTH = 200//gl.drawingBufferWidth >> TEXTURE_DOWNSAMPLE;
-const TEXTURE_HEIGHT = 200//gl.drawingBufferHeight >> TEXTURE_DOWNSAMPLE;
+const TEXTURE_WIDTH = gl.drawingBufferWidth >> TEXTURE_DOWNSAMPLE;
+const TEXTURE_HEIGHT = gl.drawingBufferHeight >> TEXTURE_DOWNSAMPLE;
 const CELL_SIZE = 1.0;
 const DENSITY_DISSIPATION = 0.99;
 const VELOCITY_DISSIPATION = 0.999;
@@ -143,7 +143,7 @@ const advectionManualFilteringShader = compileShader(gl.FRAGMENT_SHADER, `
     uniform float dt;
     uniform float dissipation;
 
-    vec4 bilerp (sampler2D sam, vec2 p) {
+    vec4 bilerp (in sampler2D sam, in vec2 p) {
         vec4 st;
         st.xy = floor(p - 0.5) + 0.5;
         st.zw = st.xy + 1.0;
@@ -176,9 +176,7 @@ const advectionShader = compileShader(gl.FRAGMENT_SHADER, `
 
     void main () {
         vec2 coord = vUv - rdx * dt * texture2D(uVelocity, vUv).xy * texelSize;
-
         gl_FragColor = dissipation * texture2D(uSource, coord);
-        gl_FragColor.a = 1.0;
     }
 `);
 
@@ -193,11 +191,20 @@ const divergenceShader = compileShader(gl.FRAGMENT_SHADER, `
     uniform sampler2D uVelocity;
     uniform float halfrdx;
 
+    vec2 sampleVelocity (in vec2 uv) {
+        vec2 multiplier = vec2(1.0, 1.0);
+        if (uv.x < 0.0) { uv.x = 0.0; multiplier.x = -1.0; }
+        if (uv.x > 1.0) { uv.x = 1.0; multiplier.x = -1.0; }
+        if (uv.y < 0.0) { uv.y = 0.0; multiplier.y = -1.0; }
+        if (uv.y > 1.0) { uv.y = 1.0; multiplier.y = -1.0; }
+        return multiplier * texture2D(uVelocity, uv).xy;
+    }
+
     void main () {
-        vec2 L = texture2D(uVelocity, vL).xy;
-        vec2 R = texture2D(uVelocity, vR).xy;
-        vec2 T = texture2D(uVelocity, vT).xy;
-        vec2 B = texture2D(uVelocity, vB).xy;
+        vec2 L = sampleVelocity(vL);
+        vec2 R = sampleVelocity(vR);
+        vec2 T = sampleVelocity(vT);
+        vec2 B = sampleVelocity(vB);
         float div = halfrdx * (R.x - L.x + T.y - B.y);
         gl_FragColor = vec4(div, 0.0, 0.0, 1.0);
     }
@@ -215,11 +222,16 @@ const pressureShader = compileShader(gl.FRAGMENT_SHADER, `
     uniform sampler2D uDivergence;
     uniform float alpha;
 
+    vec2 boundary (in vec2 uv) {
+        uv = min(max(uv, 0.0), 1.0);
+        return uv;
+    }
+
     void main () {
-        float L = texture2D(uPressure, vL).x;
-        float R = texture2D(uPressure, vR).x;
-        float T = texture2D(uPressure, vT).x;
-        float B = texture2D(uPressure, vB).x;
+        float L = texture2D(uPressure, boundary(vL)).x;
+        float R = texture2D(uPressure, boundary(vR)).x;
+        float T = texture2D(uPressure, boundary(vT)).x;
+        float B = texture2D(uPressure, boundary(vB)).x;
         float divergence = texture2D(uDivergence, vUv).x;
         float pressure = (L + R + B + T + alpha * divergence) * .25;
         gl_FragColor = vec4(pressure, 0.0, 0.0, 1.0);
@@ -238,11 +250,16 @@ const gradientSubtractShader = compileShader(gl.FRAGMENT_SHADER, `
     uniform sampler2D uVelocity;
     uniform float halfrdx;
 
+    vec2 boundary (in vec2 uv) {
+        uv = min(max(uv, 0.0), 1.0);
+        return uv;
+    }
+
     void main () {
-        float L = texture2D(uPressure, vL).x;
-        float R = texture2D(uPressure, vR).x;
-        float T = texture2D(uPressure, vT).x;
-        float B = texture2D(uPressure, vB).x;
+        float L = texture2D(uPressure, boundary(vL)).x;
+        float R = texture2D(uPressure, boundary(vR)).x;
+        float T = texture2D(uPressure, boundary(vT)).x;
+        float B = texture2D(uPressure, boundary(vB)).x;
         vec2 velocity = texture2D(uVelocity, vUv).xy;
         velocity.xy -= halfrdx * vec2(R - L, T - B);
         gl_FragColor = vec4(velocity, 0.0, 1.0);
@@ -375,7 +392,7 @@ function Update () {
         velocity.swap();
 
         gl.uniform1i(splatProgram.uniforms.uTarget, density.first[2]);
-        gl.uniform3f(splatProgram.uniforms.color, pointer.color[0] * 0.1, pointer.color[1] * 0.1, pointer.color[2] * 0.1);
+        gl.uniform3f(splatProgram.uniforms.color, pointer.color[0] * 0.2, pointer.color[1] * 0.2, pointer.color[2] * 0.2);
         blit(density.second[1]);
         density.swap();
     }
@@ -425,8 +442,8 @@ function resizeCanvas () {
 
 canvas.addEventListener('mousemove', (e) => {
     pointer.moved = pointer.down;
-    pointer.deltax = e.offsetX - pointer.x;
-    pointer.deltay = e.offsetY - pointer.y;
+    pointer.deltax = clampDelta(e.offsetX - pointer.x);
+    pointer.deltay = clampDelta(e.offsetY - pointer.y);
     pointer.x = e.offsetX;
     pointer.y = e.offsetY;
 });
@@ -435,11 +452,15 @@ canvas.addEventListener('touchmove', (e) => {
     e.preventDefault();
     const touch = e.touches[0];
     pointer.moved = pointer.down;
-    pointer.deltax = touch.offsetX - pointer.x;
-    pointer.deltay = touch.offsetY - pointer.y;
+    pointer.deltax = clampDelta(touch.offsetX - pointer.x);
+    pointer.deltay = clampDelta(touch.offsetY - pointer.y);
     pointer.x = touch.offsetX;
     pointer.y = touch.offsetY;
 });
+
+function clampDelta (delta) {
+    return Math.min(Math.max(delta, -CELL_SIZE), CELL_SIZE);
+}
 
 canvas.addEventListener('mousedown', onPointerDown);
 canvas.addEventListener('touchstart', onPointerDown);
