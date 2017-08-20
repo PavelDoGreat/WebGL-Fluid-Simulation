@@ -9,14 +9,14 @@ const support_linear_float = gl.getExtension('OES_texture_half_float_linear');
 
 resizeCanvas();
 
-const TEXTURE_DOWNSAMPLE = 2;
+const TEXTURE_DOWNSAMPLE = 1;
 const TEXTURE_WIDTH = gl.drawingBufferWidth >> TEXTURE_DOWNSAMPLE;
 const TEXTURE_HEIGHT = gl.drawingBufferHeight >> TEXTURE_DOWNSAMPLE;
 const DENSITY_DISSIPATION = 0.98;
 const VELOCITY_DISSIPATION = 0.99;
-const SPLAT_RADIUS = 0.005;
+const SPLAT_RADIUS = 0.01;
 const CURL = 30;
-const PRESSURE_ITERATIONS = 20;
+const PRESSURE_ITERATIONS = 30;
 
 class GLProgram {
     constructor (vertexShader, fragmentShader) {
@@ -221,7 +221,7 @@ const curlShader = compileShader(gl.FRAGMENT_SHADER, `
         float R = texture2D(uVelocity, vR).y;
         float T = texture2D(uVelocity, vT).x;
         float B = texture2D(uVelocity, vB).x;
-        float vorticity = 0.5 * (R - L - T + B);
+        float vorticity = R - L - T + B;
         gl_FragColor = vec4(vorticity, 0.0, 0.0, 1.0);
     }
 `);
@@ -245,12 +245,8 @@ const vorticityShader = compileShader(gl.FRAGMENT_SHADER, `
         float T = texture2D(uCurl, vT).x;
         float B = texture2D(uCurl, vB).x;
         float C = texture2D(uCurl, vUv).x;
-
-        vec2 force = 0.5 * vec2(abs(T) - abs(B), abs(R) - abs(L));
-        float lengthSquared = max(0.0001, dot(force, force));
-        force *= inversesqrt(lengthSquared) * curl * C;
-        force.y *= -1.0;
-
+        vec2 force = vec2(abs(T) - abs(B), abs(R) - abs(L));
+        force *= 1.0 / length(force + 0.00001) * curl * C;
         vec2 vel = texture2D(uVelocity, vUv).xy;
         gl_FragColor = vec4(vel + force * dt, 0.0, 1.0);
     }
@@ -390,19 +386,16 @@ const pressureProgram = new GLProgram(baseVertexShader, pressureShader);
 const gradienSubtractProgram = new GLProgram(baseVertexShader, gradientSubtractShader);
 
 let pointer = {
-    x: 0,
-    y: 0,
+    x: canvas.width * 0.5,
+    y: canvas.height * 0.7,
     deltax: 0,
-    deltay: 0,
+    deltay: -500,
     down: false,
     moved: false,
-    color: [0.4, 0, 1]
+    color: [30, 0, 300]
 }
 
-initDensityProgram.bind();
-blit(density.first[1]);
-initVelocityProgram.bind();
-blit(velocity.first[1]);
+splat();
 
 Update();
 
@@ -426,21 +419,8 @@ function Update () {
     blit(density.second[1]);
     density.swap();
 
-    if (pointer.moved)
-    {
-        splatProgram.bind();
-        gl.uniform1i(splatProgram.uniforms.uTarget, velocity.first[2]);
-        gl.uniform1f(splatProgram.uniforms.aspectRatio, TEXTURE_WIDTH / TEXTURE_HEIGHT);
-        gl.uniform2f(splatProgram.uniforms.point, pointer.x / canvas.width, 1.0 - pointer.y / canvas.height);
-        gl.uniform3f(splatProgram.uniforms.color, pointer.deltax, -pointer.deltay, 1.0);
-        gl.uniform1f(splatProgram.uniforms.radius, SPLAT_RADIUS);
-        blit(velocity.second[1]);
-        velocity.swap();
-
-        gl.uniform1i(splatProgram.uniforms.uTarget, density.first[2]);
-        gl.uniform3f(splatProgram.uniforms.color, pointer.color[0] * 0.3, pointer.color[1] * 0.3, pointer.color[2] * 0.3);
-        blit(density.second[1]);
-        density.swap();
+    if (pointer.moved) {
+        splat();
     }
 
     curlProgram.bind();
@@ -489,6 +469,22 @@ function Update () {
     requestAnimationFrame(Update);
 }
 
+function splat () {
+    splatProgram.bind();
+    gl.uniform1i(splatProgram.uniforms.uTarget, velocity.first[2]);
+    gl.uniform1f(splatProgram.uniforms.aspectRatio, TEXTURE_WIDTH / TEXTURE_HEIGHT);
+    gl.uniform2f(splatProgram.uniforms.point, pointer.x / canvas.width, 1.0 - pointer.y / canvas.height);
+    gl.uniform3f(splatProgram.uniforms.color, pointer.deltax, -pointer.deltay, 1.0);
+    gl.uniform1f(splatProgram.uniforms.radius, SPLAT_RADIUS);
+    blit(velocity.second[1]);
+    velocity.swap();
+
+    gl.uniform1i(splatProgram.uniforms.uTarget, density.first[2]);
+    gl.uniform3f(splatProgram.uniforms.color, pointer.color[0] * 0.3, pointer.color[1] * 0.3, pointer.color[2] * 0.3);
+    blit(density.second[1]);
+    density.swap();
+}
+
 function resizeCanvas () {
     if (canvas.width != canvas.clientWidth || canvas.height != canvas.clientHeight) {
         const displayHeight = canvas.clientHeight;
@@ -516,7 +512,7 @@ canvas.addEventListener('touchmove', (e) => {
 });
 
 function clampDelta (delta) {
-    return delta * 10;//Math.min(Math.max(delta, -CELL_SIZE), CELL_SIZE);
+    return delta * 10; // not a clamp really lololo
 }
 
 canvas.addEventListener('mousedown', onPointerDown);
