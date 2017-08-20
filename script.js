@@ -1,4 +1,3 @@
-
 'use strict';
 
 const canvas = document.getElementsByTagName('canvas')[0];
@@ -14,7 +13,7 @@ const TEXTURE_WIDTH = gl.drawingBufferWidth >> TEXTURE_DOWNSAMPLE;
 const TEXTURE_HEIGHT = gl.drawingBufferHeight >> TEXTURE_DOWNSAMPLE;
 const DENSITY_DISSIPATION = 0.98;
 const VELOCITY_DISSIPATION = 0.99;
-const SPLAT_RADIUS = 0.01;
+const SPLAT_RADIUS = 0.005;
 const CURL = 30;
 const PRESSURE_ITERATIONS = 30;
 
@@ -56,7 +55,7 @@ function compileShader (type, source) {
 };
 
 const baseVertexShader = compileShader(gl.VERTEX_SHADER, `
-    precision mediump float;
+    precision highp float;
 
     attribute vec2 aPosition;
     varying vec2 vUv;
@@ -77,7 +76,7 @@ const baseVertexShader = compileShader(gl.VERTEX_SHADER, `
 `);
 
 const displayShader = compileShader(gl.FRAGMENT_SHADER, `
-    precision mediump float;
+    precision highp float;
 
     varying vec2 vUv;
     varying vec2 vL;
@@ -91,29 +90,8 @@ const displayShader = compileShader(gl.FRAGMENT_SHADER, `
     }
 `);
 
-const initDensityShader = compileShader(gl.FRAGMENT_SHADER, `
-    precision mediump float;
-
-    varying vec2 vUv;
-
-    void main () {
-        float d = mod(floor(vUv.x * 10.0) + floor(vUv.y * 10.0), 2.0);
-        gl_FragColor = vec4(vec3(d), 1.0);
-    }
-`);
-
-const initVelocityShader = compileShader(gl.FRAGMENT_SHADER, `
-    precision mediump float;
-
-    varying vec2 vUv;
-
-    void main () {
-        gl_FragColor = vec4(sin(6.28 * vUv.y), sin(6.28 * vUv.x), 0.0, 1.0);
-    }
-`);
-
 const splatShader = compileShader(gl.FRAGMENT_SHADER, `
-    precision mediump float;
+    precision highp float;
 
     varying vec2 vUv;
     uniform sampler2D uTarget;
@@ -132,7 +110,7 @@ const splatShader = compileShader(gl.FRAGMENT_SHADER, `
 `);
 
 const advectionManualFilteringShader = compileShader(gl.FRAGMENT_SHADER, `
-    precision mediump float;
+    precision highp float;
 
     varying vec2 vUv;
     uniform sampler2D uVelocity;
@@ -162,7 +140,7 @@ const advectionManualFilteringShader = compileShader(gl.FRAGMENT_SHADER, `
 `);
 
 const advectionShader = compileShader(gl.FRAGMENT_SHADER, `
-    precision mediump float;
+    precision highp float;
 
     varying vec2 vUv;
     uniform sampler2D uVelocity;
@@ -178,7 +156,7 @@ const advectionShader = compileShader(gl.FRAGMENT_SHADER, `
 `);
 
 const divergenceShader = compileShader(gl.FRAGMENT_SHADER, `
-    precision mediump float;
+    precision highp float;
 
     varying vec2 vUv;
     varying vec2 vL;
@@ -207,7 +185,7 @@ const divergenceShader = compileShader(gl.FRAGMENT_SHADER, `
 `);
 
 const curlShader = compileShader(gl.FRAGMENT_SHADER, `
-    precision mediump float;
+    precision highp float;
 
     varying vec2 vUv;
     varying vec2 vL;
@@ -227,7 +205,7 @@ const curlShader = compileShader(gl.FRAGMENT_SHADER, `
 `);
 
 const vorticityShader = compileShader(gl.FRAGMENT_SHADER, `
-    precision mediump float;
+    precision highp float;
 
     varying vec2 vUv;
     varying vec2 vL;
@@ -253,7 +231,7 @@ const vorticityShader = compileShader(gl.FRAGMENT_SHADER, `
 `);
 
 const pressureShader = compileShader(gl.FRAGMENT_SHADER, `
-    precision mediump float;
+    precision highp float;
 
     varying vec2 vUv;
     varying vec2 vL;
@@ -281,7 +259,7 @@ const pressureShader = compileShader(gl.FRAGMENT_SHADER, `
 `);
 
 const gradientSubtractShader = compileShader(gl.FRAGMENT_SHADER, `
-    precision mediump float;
+    precision highp float;
 
     varying vec2 vUv;
     varying vec2 vL;
@@ -376,8 +354,6 @@ let pressure   = createDoubleFBO(TEXTURE_WIDTH, TEXTURE_HEIGHT, gl.RGBA, halfFlo
 
 const displayProgram = new GLProgram(baseVertexShader, displayShader);
 const splatProgram = new GLProgram(baseVertexShader, splatShader);
-const initDensityProgram = new GLProgram(baseVertexShader, initDensityShader);
-const initVelocityProgram = new GLProgram(baseVertexShader, initVelocityShader);
 const advectionProgram = new GLProgram(baseVertexShader, support_linear_float ? advectionShader : advectionManualFilteringShader);
 const divergenceProgram = new GLProgram(baseVertexShader, divergenceShader);
 const curlProgram = new GLProgram(baseVertexShader, curlShader);
@@ -505,10 +481,10 @@ canvas.addEventListener('touchmove', (e) => {
     e.preventDefault();
     const touch = e.touches[0];
     pointer.moved = pointer.down;
-    pointer.deltax = clampDelta(touch.offsetX - pointer.x);
-    pointer.deltay = clampDelta(touch.offsetY - pointer.y);
-    pointer.x = touch.offsetX;
-    pointer.y = touch.offsetY;
+    pointer.deltax = clampDelta(touch.pageX - pointer.x);
+    pointer.deltay = clampDelta(touch.pageY - pointer.y);
+    pointer.x = touch.pageX;
+    pointer.y = touch.pageY;
 });
 
 function clampDelta (delta) {
