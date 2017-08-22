@@ -1,6 +1,7 @@
 'use strict';
 
 const canvas = document.getElementsByTagName('canvas')[0];
+canvas.requestFullscreen();
 const params = { alpha: false, preserveDrawingBuffer: false, depth: false, stencil: false, antialias: false };
 const gl = canvas.getContext('webgl', params) || canvas.getContext('experimental-webgl', params);
 
