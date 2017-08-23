@@ -2,12 +2,19 @@
 
 const canvas = document.getElementsByTagName('canvas')[0];
 const params = { alpha: false, preserveDrawingBuffer: false, depth: false, stencil: false, antialias: false };
-const gl = canvas.getContext('webgl', params) || canvas.getContext('experimental-webgl', params);
 
+let gl = canvas.getContext('webgl2');
+const isWebGL2 = !!gl;
+if (!isWebGL2) {
+    gl = canvas.getContext('webgl', params) || canvas.getContext('experimental-webgl', params);
+}
 gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
 const halfFloat = gl.getExtension('OES_texture_half_float');
 const support_linear_float = gl.getExtension('OES_texture_half_float_linear');
+if (isWebGL2) {
+    gl.getExtension('EXT_color_buffer_float');
+}
 
 resizeCanvas();
 
@@ -325,7 +332,7 @@ function createFBO (texId, width, height, format, type, param) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, param);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, format, width, height, 0, format, type, null);
+    gl.texImage2D(gl.TEXTURE_2D, 0, format, width, height, 0, gl.RGBA, type, null);
 
     let fbo = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -355,11 +362,14 @@ function createDoubleFBO (texId, width, height, format, type, param) {
     }
 }
 
-let density    = createDoubleFBO(0, TEXTURE_WIDTH, TEXTURE_HEIGHT, gl.RGBA, halfFloat.HALF_FLOAT_OES, support_linear_float ? gl.LINEAR : gl.NEAREST);
-let velocity   = createDoubleFBO(2, TEXTURE_WIDTH, TEXTURE_HEIGHT, gl.RGBA, halfFloat.HALF_FLOAT_OES, support_linear_float ? gl.LINEAR : gl.NEAREST);
-let divergence = createFBO      (4, TEXTURE_WIDTH, TEXTURE_HEIGHT, gl.RGBA, halfFloat.HALF_FLOAT_OES, gl.NEAREST);
-let curl       = createFBO      (5, TEXTURE_WIDTH, TEXTURE_HEIGHT, gl.RGBA, halfFloat.HALF_FLOAT_OES, gl.NEAREST);
-let pressure   = createDoubleFBO(6, TEXTURE_WIDTH, TEXTURE_HEIGHT, gl.RGBA, halfFloat.HALF_FLOAT_OES, gl.NEAREST);
+const internalFormat = isWebGL2 ? gl.RGBA16F : gl.RGBA;
+const texType = isWebGL2 ? gl.HALF_FLOAT : halfFloat.HALF_FLOAT_OES;
+
+let density    = createDoubleFBO(0, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalFormat, texType, support_linear_float ? gl.LINEAR : gl.NEAREST);
+let velocity   = createDoubleFBO(2, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalFormat, texType, support_linear_float ? gl.LINEAR : gl.NEAREST);
+let divergence = createFBO      (4, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalFormat, texType, gl.NEAREST);
+let curl       = createFBO      (5, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalFormat, texType, gl.NEAREST);
+let pressure   = createDoubleFBO(6, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalFormat, texType, gl.NEAREST);
 
 const displayProgram = new GLProgram(baseVertexShader, displayShader);
 const splatProgram = new GLProgram(baseVertexShader, splatShader);
