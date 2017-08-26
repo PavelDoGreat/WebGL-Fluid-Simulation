@@ -1,7 +1,5 @@
 'use strict';
 
-window.scrollTo(0, 1);
-
 const canvas = document.getElementsByTagName('canvas')[0];
 const params = { alpha: false, depth: false, stencil: false, antialias: false };
 
@@ -490,7 +488,7 @@ function Update () {
 function splat (x, y, dx, dy, color) {
     splatProgram.bind();
     gl.uniform1i(splatProgram.uniforms.uTarget, velocity.first[2]);
-    gl.uniform1f(splatProgram.uniforms.aspectRatio, TEXTURE_WIDTH / TEXTURE_HEIGHT);
+    gl.uniform1f(splatProgram.uniforms.aspectRatio, canvas.width / canvas.height);
     gl.uniform2f(splatProgram.uniforms.point, x / canvas.width, 1.0 - y / canvas.height);
     gl.uniform3f(splatProgram.uniforms.color, dx, -dy, 1.0);
     gl.uniform1f(splatProgram.uniforms.radius, SPLAT_RADIUS);
@@ -523,9 +521,6 @@ canvas.addEventListener('touchmove', (e) => {
     e.preventDefault();
     const touches = e.targetTouches;
     for (let i = 0; i < e.touches.length; i++) {
-        if (i >= pointers.length) {
-            pointers.push(new pointerPrototype());
-        }
         let pointer = pointers[i];
         pointer.moved = pointer.down;
         pointer.dx = (touches[i].pageX - pointer.x) * 10.0;
@@ -536,13 +531,19 @@ canvas.addEventListener('touchmove', (e) => {
 }, false);
 
 canvas.addEventListener('mousedown', () => {
-    pointers[0].dowm = true;
+    pointers[0].down = true;
     pointers[0].color = [Math.random() + 0.2, Math.random() + 0.2, Math.random() + 0.2];
 });
 
-canvas.addEventListener('touchstart', () => {
-    for (let i = 0; i < pointers.length; i++) {
+canvas.addEventListener('touchstart', (e) => {
+    const touches = e.targetTouches;
+    for (let i = 0; i < touches.length; i++) {
+        if (i >= pointers.length) {
+            pointers.push(new pointerPrototype());
+        }
         pointers[i].down = true;
+        pointers[i].x = touches[i].pageX;
+        pointers[i].y = touches[i].pageY;
         pointers[i].color = [Math.random() + 0.2, Math.random() + 0.2, Math.random() + 0.2];
     }
 });
