@@ -1,9 +1,9 @@
 'use strict';
 
 const canvas = document.getElementsByTagName('canvas')[0];
-const params = { alpha: false, preserveDrawingBuffer: false, depth: false, stencil: false, antialias: false };
+const params = { alpha: false, depth: false, stencil: false, antialias: false };
 
-let gl = canvas.getContext('webgl2');
+let gl = canvas.getContext('webgl2', params);
 const isWebGL2 = !!gl;
 if (!isWebGL2) {
     gl = canvas.getContext('webgl', params) || canvas.getContext('experimental-webgl', params);
@@ -11,10 +11,13 @@ if (!isWebGL2) {
 gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
 const halfFloat = gl.getExtension('OES_texture_half_float');
-const support_linear_float = gl.getExtension('OES_texture_half_float_linear');
+let support_linear_float = gl.getExtension('OES_texture_half_float_linear');
 if (isWebGL2) {
     gl.getExtension('EXT_color_buffer_float');
+    support_linear_float = gl.getExtension('OES_texture_float_linear');
 }
+
+gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
 resizeCanvas();
 
@@ -373,7 +376,7 @@ let pressure   = createDoubleFBO(6, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalForma
 
 const displayProgram = new GLProgram(baseVertexShader, displayShader);
 const splatProgram = new GLProgram(baseVertexShader, splatShader);
-const advectionProgram = new GLProgram(baseVertexShader, support_linear_float ? advectionShader : advectionManualFilteringShader);
+const advectionProgram = new GLProgram(baseVertexShader, advectionManualFilteringShader);
 const divergenceProgram = new GLProgram(baseVertexShader, divergenceShader);
 const curlProgram = new GLProgram(baseVertexShader, curlShader);
 const vorticityProgram = new GLProgram(baseVertexShader, vorticityShader);
