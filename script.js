@@ -19,12 +19,24 @@ if (isWebGL2) {
     support_linear_float = gl.getExtension('OES_texture_float_linear');
 }
 
-const TEXTURE_DOWNSAMPLE = 1;
-const DENSITY_DISSIPATION = 0.98;
-const VELOCITY_DISSIPATION = 0.99;
-const SPLAT_RADIUS = 0.005;
-const CURL = 30;
-const PRESSURE_ITERATIONS = 20;
+let config = {
+    TEXTURE_DOWNSAMPLE: 1,
+    DENSITY_DISSIPATION: 0.98,
+    VELOCITY_DISSIPATION: 0.99,
+    SPLAT_RADIUS: 0.005,
+    CURL: 30,
+    PRESSURE_ITERATIONS: 25,
+    CLEAR_PRESSURE: false
+}
+
+var gui = new dat.GUI();
+gui.add(config, 'TEXTURE_DOWNSAMPLE', { Full: 0, Half: 1, Quarter: 2 }).name('Resolution').onFinishChange(initFramebuffers);
+gui.add(config, 'DENSITY_DISSIPATION', 0.9, 1.0).name('Density dissipation');
+gui.add(config, 'VELOCITY_DISSIPATION', 0.9, 1.0).name('Velocity dissipation');
+gui.add(config, 'SPLAT_RADIUS', 0.001, 0.01).name('Splat radius');
+gui.add(config, 'CURL', 0, 50).name('Vorticity').step(1);
+gui.add(config, 'PRESSURE_ITERATIONS', 1, 60).name('Iterations');
+gui.add(config, 'CLEAR_PRESSURE').name('Clear pressure');
 
 class GLProgram {
     constructor (vertexShader, fragmentShader) {
@@ -368,8 +380,8 @@ let curl;
 let pressure;
 
 function initFramebuffers () {
-    textureWidth = gl.drawingBufferWidth >> TEXTURE_DOWNSAMPLE;
-    textureHeight = gl.drawingBufferHeight >> TEXTURE_DOWNSAMPLE;
+    textureWidth = gl.drawingBufferWidth >> config.TEXTURE_DOWNSAMPLE;
+    textureHeight = gl.drawingBufferHeight >> config.TEXTURE_DOWNSAMPLE;
 
     const internalFormat = isWebGL2 ? gl.RGBA16F : gl.RGBA;
     const internalFormatRG = isWebGL2 ? gl.RG16F : gl.RGBA;
@@ -433,13 +445,13 @@ function Update () {
     gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.first[2]);
     gl.uniform1i(advectionProgram.uniforms.uSource, velocity.first[2]);
     gl.uniform1f(advectionProgram.uniforms.dt, dt);
-    gl.uniform1f(advectionProgram.uniforms.dissipation, VELOCITY_DISSIPATION);
+    gl.uniform1f(advectionProgram.uniforms.dissipation, config.VELOCITY_DISSIPATION);
     blit(velocity.second[1]);
     velocity.swap();
 
     gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.first[2]);
     gl.uniform1i(advectionProgram.uniforms.uSource, density.first[2]);
-    gl.uniform1f(advectionProgram.uniforms.dissipation, DENSITY_DISSIPATION);
+    gl.uniform1f(advectionProgram.uniforms.dissipation, config.DENSITY_DISSIPATION);
     blit(density.second[1]);
     density.swap();
 
@@ -460,7 +472,7 @@ function Update () {
     gl.uniform2f(vorticityProgram.uniforms.texelSize, 1.0 / textureWidth, 1.0 / textureHeight);
     gl.uniform1i(vorticityProgram.uniforms.uVelocity, velocity.first[2]);
     gl.uniform1i(vorticityProgram.uniforms.uCurl, curl[2]);
-    gl.uniform1f(vorticityProgram.uniforms.curl, CURL);
+    gl.uniform1f(vorticityProgram.uniforms.curl, config.CURL);
     gl.uniform1f(vorticityProgram.uniforms.dt, dt);
     blit(velocity.second[1]);
     velocity.swap();
@@ -470,11 +482,13 @@ function Update () {
     gl.uniform1i(divergenceProgram.uniforms.uVelocity, velocity.first[2]);
     blit(divergence[1]);
 
-    // clear(pressure.first[1]);
+    if (config.CLEAR_PRESSURE) {
+        clear(pressure.first[1]);
+    }
     pressureProgram.bind();
     gl.uniform2f(pressureProgram.uniforms.texelSize, 1.0 / textureWidth, 1.0 / textureHeight);
     gl.uniform1i(pressureProgram.uniforms.uDivergence, divergence[2]);
-    for (let i = 0; i < PRESSURE_ITERATIONS; i++) {
+    for (let i = 0; i < config.PRESSURE_ITERATIONS; i++) {
         gl.uniform1i(pressureProgram.uniforms.uPressure, pressure.first[2]);
         blit(pressure.second[1]);
         pressure.swap();
@@ -501,7 +515,7 @@ function splat (x, y, dx, dy, color) {
     gl.uniform1f(splatProgram.uniforms.aspectRatio, canvas.width / canvas.height);
     gl.uniform2f(splatProgram.uniforms.point, x / canvas.width, 1.0 - y / canvas.height);
     gl.uniform3f(splatProgram.uniforms.color, dx, -dy, 1.0);
-    gl.uniform1f(splatProgram.uniforms.radius, SPLAT_RADIUS);
+    gl.uniform1f(splatProgram.uniforms.radius, config.SPLAT_RADIUS);
     blit(velocity.second[1]);
     velocity.swap();
 
