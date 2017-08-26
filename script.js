@@ -376,7 +376,7 @@ let pressure   = createDoubleFBO(6, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalForma
 
 const displayProgram = new GLProgram(baseVertexShader, displayShader);
 const splatProgram = new GLProgram(baseVertexShader, splatShader);
-const advectionProgram = new GLProgram(baseVertexShader, advectionManualFilteringShader);
+const advectionProgram = new GLProgram(baseVertexShader, support_linear_float ? advectionShader : advectionManualFilteringShader);
 const divergenceProgram = new GLProgram(baseVertexShader, divergenceShader);
 const curlProgram = new GLProgram(baseVertexShader, curlShader);
 const vorticityProgram = new GLProgram(baseVertexShader, vorticityShader);
