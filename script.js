@@ -1,5 +1,7 @@
 'use strict';
 
+window.scrollTo(0, 1);
+
 const canvas = document.getElementsByTagName('canvas')[0];
 const params = { alpha: false, depth: false, stencil: false, antialias: false };
 
@@ -412,7 +414,7 @@ Update();
 
 function Update () {
     resizeCanvas();
-    
+
     const dt = Math.min((Date.now() - lastTime) / 1000, 0.016);
     lastTime = Date.now();
 
@@ -432,7 +434,7 @@ function Update () {
     gl.uniform1f(advectionProgram.uniforms.dissipation, DENSITY_DISSIPATION);
     blit(density.second[1]);
     density.swap();
-    
+
     for (let i = 0; i < pointers.length; i++) {
         const pointer = pointers[i];
         if (pointer.moved) {
@@ -519,30 +521,34 @@ canvas.addEventListener('mousemove', (e) => {
 
 canvas.addEventListener('touchmove', (e) => {
     e.preventDefault();
+    const touches = e.targetTouches;
     for (let i = 0; i < e.touches.length; i++) {
         if (i >= pointers.length) {
             pointers.push(new pointerPrototype());
         }
         let pointer = pointers[i];
         pointer.moved = pointer.down;
-        pointer.dx = (e.touches[i].pageX - pointer.x) * 10.0;
-        pointer.dy = (e.touches[i].pageY - pointer.y) * 10.0;
-        pointer.x = e.touches[i].pageX;
-        pointer.y = e.touches[i].pageY;
+        pointer.dx = (touches[i].pageX - pointer.x) * 10.0;
+        pointer.dy = (touches[i].pageY - pointer.y) * 10.0;
+        pointer.x = touches[i].pageX;
+        pointer.y = touches[i].pageY;
     }
+}, false);
+
+canvas.addEventListener('mousedown', () => {
+    pointers[0].dowm = true;
+    pointers[0].color = [Math.random() + 0.2, Math.random() + 0.2, Math.random() + 0.2];
 });
 
-canvas.addEventListener('mousedown', onPointerDown);
-canvas.addEventListener('touchstart', onPointerDown);
-window.addEventListener('mouseup', onPointerUp);
-window.addEventListener('touchend', onPointerUp);
-
-function onPointerDown () {
+canvas.addEventListener('touchstart', () => {
     for (let i = 0; i < pointers.length; i++) {
         pointers[i].down = true;
         pointers[i].color = [Math.random() + 0.2, Math.random() + 0.2, Math.random() + 0.2];
     }
-}
+});
+
+window.addEventListener('mouseup', onPointerUp);
+window.addEventListener('touchend', onPointerUp);
 
 function onPointerUp () {
     for (let i = 0; i < pointers.length; i++) {
