@@ -28,7 +28,7 @@ const DENSITY_DISSIPATION = 0.98;
 const VELOCITY_DISSIPATION = 0.99;
 const SPLAT_RADIUS = 0.005;
 const CURL = 30;
-const PRESSURE_ITERATIONS = 25;
+const PRESSURE_ITERATIONS = 20;
 
 class GLProgram {
     constructor (vertexShader, fragmentShader) {
@@ -327,7 +327,7 @@ function clear (target) {
     gl.clear(gl.COLOR_BUFFER_BIT);
 }
 
-function createFBO (texId, width, height, format, type, param) {
+function createFBO (texId, w, h, internalFormat, format, type, param) {
     gl.activeTexture(gl.TEXTURE0 + texId);
     let texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -335,20 +335,20 @@ function createFBO (texId, width, height, format, type, param) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, param);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, format, width, height, 0, gl.RGBA, type, null);
+    gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, w, h, 0, format, type, null);
 
     let fbo = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-    gl.viewport(0, 0, width, height);
+    gl.viewport(0, 0, w, h);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     return [texture, fbo, texId];
 }
 
-function createDoubleFBO (texId, width, height, format, type, param) {
-    let fbo1 = createFBO(texId, width, height, format, type, param);
-    let fbo2 = createFBO(texId + 1, width, height, format, type, param);
+function createDoubleFBO (texId, w, h, internalFormat, format, type, param) {
+    let fbo1 = createFBO(texId    , w, h, internalFormat, format, type, param);
+    let fbo2 = createFBO(texId + 1, w, h, internalFormat, format, type, param);
 
     return {
         get first () {
@@ -366,13 +366,15 @@ function createDoubleFBO (texId, width, height, format, type, param) {
 }
 
 const internalFormat = isWebGL2 ? gl.RGBA16F : gl.RGBA;
+const internalFormatRG = isWebGL2 ? gl.RG16F : gl.RGBA;
+const formatRG = isWebGL2 ? gl.RG : gl.RGBA;
 const texType = isWebGL2 ? gl.HALF_FLOAT : halfFloat.HALF_FLOAT_OES;
 
-let density    = createDoubleFBO(0, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalFormat, texType, support_linear_float ? gl.LINEAR : gl.NEAREST);
-let velocity   = createDoubleFBO(2, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalFormat, texType, support_linear_float ? gl.LINEAR : gl.NEAREST);
-let divergence = createFBO      (4, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalFormat, texType, gl.NEAREST);
-let curl       = createFBO      (5, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalFormat, texType, gl.NEAREST);
-let pressure   = createDoubleFBO(6, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalFormat, texType, gl.NEAREST);
+let density    = createDoubleFBO(0, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalFormat  , gl.RGBA , texType, support_linear_float ? gl.LINEAR : gl.NEAREST);
+let velocity   = createDoubleFBO(2, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalFormatRG, formatRG, texType, support_linear_float ? gl.LINEAR : gl.NEAREST);
+let divergence = createFBO      (4, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalFormatRG, formatRG, texType, gl.NEAREST);
+let curl       = createFBO      (5, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalFormatRG, formatRG, texType, gl.NEAREST);
+let pressure   = createDoubleFBO(6, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalFormatRG, formatRG, texType, gl.NEAREST);
 
 const displayProgram = new GLProgram(baseVertexShader, displayShader);
 const splatProgram = new GLProgram(baseVertexShader, splatShader);
