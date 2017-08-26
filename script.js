@@ -1,8 +1,10 @@
 'use strict';
 
 const canvas = document.getElementsByTagName('canvas')[0];
-const params = { alpha: false, depth: false, stencil: false, antialias: false };
+canvas.width = canvas.clientWidth;
+canvas.height = canvas.clientHeight;
 
+const params = { alpha: false, depth: false, stencil: false, antialias: false };
 let gl = canvas.getContext('webgl2', params);
 const isWebGL2 = !!gl;
 if (!isWebGL2) {
@@ -17,13 +19,7 @@ if (isWebGL2) {
     support_linear_float = gl.getExtension('OES_texture_float_linear');
 }
 
-gl.clearColor(0.0, 0.0, 0.0, 1.0);
-
-resizeCanvas();
-
 const TEXTURE_DOWNSAMPLE = 1;
-const TEXTURE_WIDTH = gl.drawingBufferWidth >> TEXTURE_DOWNSAMPLE;
-const TEXTURE_HEIGHT = gl.drawingBufferHeight >> TEXTURE_DOWNSAMPLE;
 const DENSITY_DISSIPATION = 0.98;
 const VELOCITY_DISSIPATION = 0.99;
 const SPLAT_RADIUS = 0.005;
@@ -39,9 +35,8 @@ class GLProgram {
         gl.attachShader(this.program, fragmentShader);
         gl.linkProgram(this.program);
 
-        if (!gl.getProgramParameter(this.program, gl.LINK_STATUS)) {
+        if (!gl.getProgramParameter(this.program, gl.LINK_STATUS))
             throw gl.getProgramInfoLog(this.program);
-        }
 
         const uniformCount = gl.getProgramParameter(this.program, gl.ACTIVE_UNIFORMS);
         for (let i = 0; i < uniformCount; i++) {
@@ -60,9 +55,8 @@ function compileShader (type, source) {
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
 
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
         throw gl.getShaderInfoLog(shader);
-    }
 
     return shader;
 };
@@ -365,16 +359,31 @@ function createDoubleFBO (texId, w, h, internalFormat, format, type, param) {
     }
 }
 
-const internalFormat = isWebGL2 ? gl.RGBA16F : gl.RGBA;
-const internalFormatRG = isWebGL2 ? gl.RG16F : gl.RGBA;
-const formatRG = isWebGL2 ? gl.RG : gl.RGBA;
-const texType = isWebGL2 ? gl.HALF_FLOAT : halfFloat.HALF_FLOAT_OES;
+let textureWidth;
+let textureHeight;
+let density;
+let velocity;
+let divergence;
+let curl;
+let pressure;
 
-let density    = createDoubleFBO(0, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalFormat  , gl.RGBA , texType, support_linear_float ? gl.LINEAR : gl.NEAREST);
-let velocity   = createDoubleFBO(2, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalFormatRG, formatRG, texType, support_linear_float ? gl.LINEAR : gl.NEAREST);
-let divergence = createFBO      (4, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalFormatRG, formatRG, texType, gl.NEAREST);
-let curl       = createFBO      (5, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalFormatRG, formatRG, texType, gl.NEAREST);
-let pressure   = createDoubleFBO(6, TEXTURE_WIDTH, TEXTURE_HEIGHT, internalFormatRG, formatRG, texType, gl.NEAREST);
+function initFramebuffers () {
+    textureWidth = gl.drawingBufferWidth >> TEXTURE_DOWNSAMPLE;
+    textureHeight = gl.drawingBufferHeight >> TEXTURE_DOWNSAMPLE;
+
+    const internalFormat = isWebGL2 ? gl.RGBA16F : gl.RGBA;
+    const internalFormatRG = isWebGL2 ? gl.RG16F : gl.RGBA;
+    const formatRG = isWebGL2 ? gl.RG : gl.RGBA;
+    const texType = isWebGL2 ? gl.HALF_FLOAT : halfFloat.HALF_FLOAT_OES;
+
+    density    = createDoubleFBO(0, textureWidth, textureHeight, internalFormat  , gl.RGBA , texType, support_linear_float ? gl.LINEAR : gl.NEAREST);
+    velocity   = createDoubleFBO(2, textureWidth, textureHeight, internalFormatRG, formatRG, texType, support_linear_float ? gl.LINEAR : gl.NEAREST);
+    divergence = createFBO      (4, textureWidth, textureHeight, internalFormatRG, formatRG, texType, gl.NEAREST);
+    curl       = createFBO      (5, textureWidth, textureHeight, internalFormatRG, formatRG, texType, gl.NEAREST);
+    pressure   = createDoubleFBO(6, textureWidth, textureHeight, internalFormatRG, formatRG, texType, gl.NEAREST);
+}
+
+initFramebuffers();
 
 const displayProgram = new GLProgram(baseVertexShader, displayShader);
 const splatProgram = new GLProgram(baseVertexShader, splatShader);
@@ -386,6 +395,7 @@ const pressureProgram = new GLProgram(baseVertexShader, pressureShader);
 const gradienSubtractProgram = new GLProgram(baseVertexShader, gradientSubtractShader);
 
 function pointerPrototype () {
+    this.id = -1;
     this.x = 0;
     this.y = 0;
     this.dx = 0;
@@ -416,10 +426,10 @@ function Update () {
     const dt = Math.min((Date.now() - lastTime) / 1000, 0.016);
     lastTime = Date.now();
 
-    gl.viewport(0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
+    gl.viewport(0, 0, textureWidth, textureHeight);
 
     advectionProgram.bind();
-    gl.uniform2f(advectionProgram.uniforms.texelSize, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
+    gl.uniform2f(advectionProgram.uniforms.texelSize, 1.0 / textureWidth, 1.0 / textureHeight);
     gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.first[2]);
     gl.uniform1i(advectionProgram.uniforms.uSource, velocity.first[2]);
     gl.uniform1f(advectionProgram.uniforms.dt, dt);
@@ -442,12 +452,12 @@ function Update () {
     }
 
     curlProgram.bind();
-    gl.uniform2f(curlProgram.uniforms.texelSize, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
+    gl.uniform2f(curlProgram.uniforms.texelSize, 1.0 / textureWidth, 1.0 / textureHeight);
     gl.uniform1i(curlProgram.uniforms.uVelocity, velocity.first[2]);
     blit(curl[1]);
 
     vorticityProgram.bind();
-    gl.uniform2f(vorticityProgram.uniforms.texelSize, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
+    gl.uniform2f(vorticityProgram.uniforms.texelSize, 1.0 / textureWidth, 1.0 / textureHeight);
     gl.uniform1i(vorticityProgram.uniforms.uVelocity, velocity.first[2]);
     gl.uniform1i(vorticityProgram.uniforms.uCurl, curl[2]);
     gl.uniform1f(vorticityProgram.uniforms.curl, CURL);
@@ -456,13 +466,13 @@ function Update () {
     velocity.swap();
 
     divergenceProgram.bind();
-    gl.uniform2f(divergenceProgram.uniforms.texelSize, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
+    gl.uniform2f(divergenceProgram.uniforms.texelSize, 1.0 / textureWidth, 1.0 / textureHeight);
     gl.uniform1i(divergenceProgram.uniforms.uVelocity, velocity.first[2]);
     blit(divergence[1]);
 
     clear(pressure.first[1]);
     pressureProgram.bind();
-    gl.uniform2f(pressureProgram.uniforms.texelSize, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
+    gl.uniform2f(pressureProgram.uniforms.texelSize, 1.0 / textureWidth, 1.0 / textureHeight);
     gl.uniform1i(pressureProgram.uniforms.uDivergence, divergence[2]);
     for (let i = 0; i < PRESSURE_ITERATIONS; i++) {
         gl.uniform1i(pressureProgram.uniforms.uPressure, pressure.first[2]);
@@ -471,7 +481,7 @@ function Update () {
     }
 
     gradienSubtractProgram.bind();
-    gl.uniform2f(gradienSubtractProgram.uniforms.texelSize, 1.0 / TEXTURE_WIDTH, 1.0 / TEXTURE_HEIGHT);
+    gl.uniform2f(gradienSubtractProgram.uniforms.texelSize, 1.0 / textureWidth, 1.0 / textureHeight);
     gl.uniform1i(gradienSubtractProgram.uniforms.uPressure, pressure.first[2]);
     gl.uniform1i(gradienSubtractProgram.uniforms.uVelocity, velocity.first[2]);
     blit(velocity.second[1]);
@@ -503,9 +513,9 @@ function splat (x, y, dx, dy, color) {
 
 function resizeCanvas () {
     if (canvas.width != canvas.clientWidth || canvas.height != canvas.clientHeight) {
-        const displayHeight = canvas.clientHeight;
         canvas.width = canvas.clientWidth;
-        canvas.height = displayHeight;
+        canvas.height = canvas.clientHeight;
+        initFramebuffers();
     }
 }
 
@@ -538,9 +548,10 @@ canvas.addEventListener('mousedown', () => {
 canvas.addEventListener('touchstart', (e) => {
     const touches = e.targetTouches;
     for (let i = 0; i < touches.length; i++) {
-        if (i >= pointers.length) {
+        if (i >= pointers.length)
             pointers.push(new pointerPrototype());
-        }
+
+        pointers[i].id = touches[i].identifier;
         pointers[i].down = true;
         pointers[i].x = touches[i].pageX;
         pointers[i].y = touches[i].pageY;
@@ -548,11 +559,14 @@ canvas.addEventListener('touchstart', (e) => {
     }
 });
 
-window.addEventListener('mouseup', onPointerUp);
-window.addEventListener('touchend', onPointerUp);
+window.addEventListener('mouseup', () => {
+    pointers[0].down = false;
+});
 
-function onPointerUp () {
-    for (let i = 0; i < pointers.length; i++) {
-        pointers[i].down = false;
-    }
-}
+window.addEventListener('touchend', (e) => {
+    const touches = e.changedTouches;
+    for (let i = 0; i < touches.length; i++)
+        for (let j = 0; j < pointers.length; j++)
+            if (touches[i].identifier == pointers[j].id)
+                pointers[j].down = false;
+});
