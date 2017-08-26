@@ -470,7 +470,7 @@ function Update () {
     gl.uniform1i(divergenceProgram.uniforms.uVelocity, velocity.first[2]);
     blit(divergence[1]);
 
-    clear(pressure.first[1]);
+    // clear(pressure.first[1]);
     pressureProgram.bind();
     gl.uniform2f(pressureProgram.uniforms.texelSize, 1.0 / textureWidth, 1.0 / textureHeight);
     gl.uniform1i(pressureProgram.uniforms.uDivergence, divergence[2]);
