@@ -1,7 +1,19 @@
+<!DOCTYPE html>
 <html>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <head>
+        <meta charset="utf-8">
+        <title>Fluid Simulation</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+        <meta property="og:type" content="website">
+        <meta property="og:title" content="webgl fluid simulation">
+        <meta property="og:url" content="https://paveldogreat.github.io/WebGL-Fluid-Simulation/">
+        <meta property="og:image" content="logo.png">
+        <script type="text/javascript" src="dat.gui.min.js"></script>
         <style>
+            * {
+                user-select: none;
+            }
+
             html, body {
                 overflow: hidden;
             }
@@ -17,9 +29,48 @@
                 width: 100%;
                 height: 100%;
             }
+
+            .dg {
+                opacity: 0.9;
+            }
+
+            .dg .property-name {
+                overflow: visible;
+            }
+
+            @font-face {
+                font-family: 'iconfont';
+                src: url('iconfont.ttf') format('truetype');
+            }
+
+            .bigFont {
+                font-size: 150%;
+                color: #8C8C8C;
+            }
+
+            .icon {
+                 font-family: 'iconfont';
+                 font-size: 130%;
+                 float: right;
+            }
+
+            .twitter:before {
+                content: 'a';
+            }
+
+            .github:before {
+                content: 'b';
+            }
         </style>
+        <script>
+            (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+            m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+            })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+            ga('create', 'UA-105392568-1', 'auto');
+            ga('send', 'pageview');
+        </script>
     </head>
-    <script type="text/javascript" src="dat.gui.min.js"></script>
     <body>
         <canvas></canvas>
         <script src="./script.js"></script>

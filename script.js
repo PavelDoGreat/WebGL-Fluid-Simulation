@@ -11,6 +11,7 @@ if (!isWebGL2) {
     gl = canvas.getContext('webgl', params) || canvas.getContext('experimental-webgl', params);
 }
 gl.clearColor(0.0, 0.0, 0.0, 1.0);
+gl.enable(gl.BLEND);
 
 const halfFloat = gl.getExtension('OES_texture_half_float');
 let support_linear_float = gl.getExtension('OES_texture_half_float_linear');
@@ -23,20 +24,34 @@ let config = {
     TEXTURE_DOWNSAMPLE: 1,
     DENSITY_DISSIPATION: 0.98,
     VELOCITY_DISSIPATION: 0.99,
-    SPLAT_RADIUS: 0.005,
-    CURL: 30,
+    PRESSURE_CONCENTRATION: 0.8,
     PRESSURE_ITERATIONS: 25,
-    CLEAR_PRESSURE: false
+    CURL: 30,
+    SPLAT_RADIUS: 0.005
 }
 
-var gui = new dat.GUI();
-gui.add(config, 'TEXTURE_DOWNSAMPLE', { Full: 0, Half: 1, Quarter: 2 }).name('Resolution').onFinishChange(initFramebuffers);
-gui.add(config, 'DENSITY_DISSIPATION', 0.9, 1.0).name('Density dissipation');
-gui.add(config, 'VELOCITY_DISSIPATION', 0.9, 1.0).name('Velocity dissipation');
-gui.add(config, 'SPLAT_RADIUS', 0.001, 0.01).name('Splat radius');
-gui.add(config, 'CURL', 0, 50).name('Vorticity').step(1);
-gui.add(config, 'PRESSURE_ITERATIONS', 1, 60).name('Iterations');
-gui.add(config, 'CLEAR_PRESSURE').name('Clear pressure');
+var gui = new dat.GUI({ width: 270 });
+gui.add(config, 'TEXTURE_DOWNSAMPLE', { Full: 0, Half: 1, Quarter: 2 }).name('resolution').onFinishChange(initFramebuffers);
+gui.add(config, 'DENSITY_DISSIPATION', 0.9, 1.0).name('density diffusion');
+gui.add(config, 'VELOCITY_DISSIPATION', 0.9, 1.0).name('velocity diffusion');
+gui.add(config, 'PRESSURE_CONCENTRATION', 0.0, 1.0).name('jelly');
+gui.add(config, 'PRESSURE_ITERATIONS', 1, 60).name('iterations');
+gui.add(config, 'CURL', 0, 50).name('vorticity').step(1);
+gui.add(config, 'SPLAT_RADIUS', 0.0001, 0.01).name('splat radius');
+
+let github = gui.add({ fun : function () { window.open('https://github.com/PavelDoGreat/WebGL-Fluid-Simulation'); } }, 'fun').name('Github');
+github.__li.className = 'cr function bigFont';
+github.__li.style.borderLeft = '3px solid #8C8C8C';
+let githubIcon = document.createElement('span');
+github.domElement.parentElement.appendChild(githubIcon);
+githubIcon.className = 'icon github';
+
+let twitter = gui.add({ fun : function () { window.open('https://twitter.com/PavelDoGreat'); } }, 'fun').name('Twitter');
+twitter.__li.className = 'cr function bigFont';
+twitter.__li.style.borderLeft = '3px solid #8C8C8C';
+let twitterIcon = document.createElement('span');
+twitter.domElement.parentElement.appendChild(twitterIcon);
+twitterIcon.className = 'icon twitter';
 
 class GLProgram {
     constructor (vertexShader, fragmentShader) {
@@ -92,6 +107,19 @@ const baseVertexShader = compileShader(gl.VERTEX_SHADER, `
         vT = vUv + vec2(0.0, texelSize.y);
         vB = vUv - vec2(0.0, texelSize.y);
         gl_Position = vec4(aPosition, 0.0, 1.0);
+    }
+`);
+
+const clearShader = compileShader(gl.FRAGMENT_SHADER, `
+    precision highp float;
+    precision mediump sampler2D;
+
+    varying vec2 vUv;
+    uniform sampler2D uTexture;
+    uniform float value;
+
+    void main () {
+        gl_FragColor = value * texture2D(uTexture, vUv);
     }
 `);
 
@@ -397,6 +425,7 @@ function initFramebuffers () {
 
 initFramebuffers();
 
+const clearProgram = new GLProgram(baseVertexShader, clearShader);
 const displayProgram = new GLProgram(baseVertexShader, displayShader);
 const splatProgram = new GLProgram(baseVertexShader, splatShader);
 const advectionProgram = new GLProgram(baseVertexShader, support_linear_float ? advectionShader : advectionManualFilteringShader);
@@ -482,9 +511,12 @@ function Update () {
     gl.uniform1i(divergenceProgram.uniforms.uVelocity, velocity.first[2]);
     blit(divergence[1]);
 
-    if (config.CLEAR_PRESSURE) {
-        clear(pressure.first[1]);
-    }
+    clearProgram.bind();
+    gl.uniform1i(clearProgram.uniforms.uTexture, pressure.first[2]);
+    gl.uniform1f(clearProgram.uniforms.value, config.PRESSURE_CONCENTRATION);
+    blit(pressure.second[1]);
+    pressure.swap();
+
     pressureProgram.bind();
     gl.uniform2f(pressureProgram.uniforms.texelSize, 1.0 / textureWidth, 1.0 / textureHeight);
     gl.uniform1i(pressureProgram.uniforms.uDivergence, divergence[2]);
@@ -544,7 +576,7 @@ canvas.addEventListener('mousemove', (e) => {
 canvas.addEventListener('touchmove', (e) => {
     e.preventDefault();
     const touches = e.targetTouches;
-    for (let i = 0; i < e.touches.length; i++) {
+    for (let i = 0; i < touches.length; i++) {
         let pointer = pointers[i];
         pointer.moved = pointer.down;
         pointer.dx = (touches[i].pageX - pointer.x) * 10.0;
