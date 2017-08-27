@@ -584,7 +584,7 @@ canvas.addEventListener('touchmove', (e) => {
         pointer.x = touches[i].pageX;
         pointer.y = touches[i].pageY;
     }
-}, { passive: true });
+}, false);
 
 canvas.addEventListener('mousedown', () => {
     pointers[0].down = true;
@@ -592,6 +592,7 @@ canvas.addEventListener('mousedown', () => {
 });
 
 canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
     const touches = e.targetTouches;
     for (let i = 0; i < touches.length; i++) {
         if (i >= pointers.length)
@@ -603,7 +604,7 @@ canvas.addEventListener('touchstart', (e) => {
         pointers[i].y = touches[i].pageY;
         pointers[i].color = [Math.random() + 0.2, Math.random() + 0.2, Math.random() + 0.2];
     }
-}, { passive: true });
+});
 
 window.addEventListener('mouseup', () => {
     pointers[0].down = false;
