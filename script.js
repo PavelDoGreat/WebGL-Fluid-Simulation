@@ -616,3 +616,7 @@ window.addEventListener('touchend', (e) => {
             if (touches[i].identifier == pointers[j].id)
                 pointers[j].down = false;
 });
+
+window.addEventListener("load", () => {
+    window.scrollTo(1, 0);
+}, false);
