@@ -2,6 +2,8 @@
 
 [Play here](https://paveldogreat.github.io/WebGL-Fluid-Simulation/)
 
+![Beautiful screenshot of flowing fluids](/screenshot.png?raw=true)
+
 ## References
 
 http://developer.download.nvidia.com/books/HTML/gpugems/gpugems_ch38.html
