@@ -2,7 +2,7 @@
 
 [Play here](https://paveldogreat.github.io/WebGL-Fluid-Simulation/)
 
-![Beautiful screenshot of flowing fluids](/screenshot.png?raw=true)
+<img src="/screenshot.png?raw=true" width="800">
 
 ## References
 
