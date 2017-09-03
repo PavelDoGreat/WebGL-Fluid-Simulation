@@ -127,10 +127,6 @@ const displayShader = compileShader(gl.FRAGMENT_SHADER, `
     precision mediump sampler2D;
 
     varying vec2 vUv;
-    varying vec2 vL;
-    varying vec2 vR;
-    varying vec2 vT;
-    varying vec2 vB;
     uniform sampler2D uTexture;
 
     void main () {
@@ -458,9 +454,9 @@ for (let i = 0; i < 10; i++) {
 }
 
 let lastTime = Date.now();
-Update();
+update();
 
-function Update () {
+function update () {
     resizeCanvas();
 
     const dt = Math.min((Date.now() - lastTime) / 1000, 0.016);
@@ -537,7 +533,7 @@ function Update () {
     gl.uniform1i(displayProgram.uniforms.uTexture, density.first[2]);
     blit(null);
 
-    requestAnimationFrame(Update);
+    requestAnimationFrame(update);
 }
 
 function splat (x, y, dx, dy, color) {
