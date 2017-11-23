@@ -507,7 +507,11 @@ function update () {
     blit(divergence[1]);
 
     clearProgram.bind();
-    gl.uniform1i(clearProgram.uniforms.uTexture, pressure.first[2]);
+    
+    let pressureTexId = pressure.first[2];
+    gl.activeTexture(gl.TEXTURE0 + pressureTexId);
+    gl.bindTexture(gl.TEXTURE_2D, pressure.first[0]);
+    gl.uniform1i(clearProgram.uniforms.uTexture, pressureTexId);
     gl.uniform1f(clearProgram.uniforms.value, config.PRESSURE_CONCENTRATION);
     blit(pressure.second[1]);
     pressure.swap();
@@ -515,8 +519,11 @@ function update () {
     pressureProgram.bind();
     gl.uniform2f(pressureProgram.uniforms.texelSize, 1.0 / textureWidth, 1.0 / textureHeight);
     gl.uniform1i(pressureProgram.uniforms.uDivergence, divergence[2]);
+    pressureTexId = pressure.first[2];
+    gl.activeTexture(gl.TEXTURE0 + pressureTexId);
     for (let i = 0; i < config.PRESSURE_ITERATIONS; i++) {
-        gl.uniform1i(pressureProgram.uniforms.uPressure, pressure.first[2]);
+        gl.bindTexture(gl.TEXTURE_2D, pressure.first[0]);
+        gl.uniform1i(pressureProgram.uniforms.uPressure, pressureTexId);
         blit(pressure.second[1]);
         pressure.swap();
     }
