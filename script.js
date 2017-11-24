@@ -11,7 +11,7 @@ let config = {
     PRESSURE_DISSIPATION: 0.8,
     PRESSURE_ITERATIONS: 25,
     CURL: 30,
-    SPLAT_RADIUS: 0.0025
+    SPLAT_RADIUS: 0.005
 }
 
 let pointers = [];
