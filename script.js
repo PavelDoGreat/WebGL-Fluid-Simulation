@@ -4,53 +4,100 @@ const canvas = document.getElementsByTagName('canvas')[0];
 canvas.width = canvas.clientWidth;
 canvas.height = canvas.clientHeight;
 
-const params = { alpha: false, depth: false, stencil: false, antialias: false };
-let gl = canvas.getContext('webgl2', params);
-const isWebGL2 = !!gl;
-if (!isWebGL2) {
-    gl = canvas.getContext('webgl', params) || canvas.getContext('experimental-webgl', params);
-}
-gl.clearColor(0.0, 0.0, 0.0, 1.0);
-
-const halfFloat = gl.getExtension('OES_texture_half_float');
-let support_linear_float = gl.getExtension('OES_texture_half_float_linear');
-if (isWebGL2) {
-    gl.getExtension('EXT_color_buffer_float');
-    support_linear_float = gl.getExtension('OES_texture_float_linear');
-}
-
 let config = {
     TEXTURE_DOWNSAMPLE: 1,
     DENSITY_DISSIPATION: 0.98,
     VELOCITY_DISSIPATION: 0.99,
-    PRESSURE_CONCENTRATION: 0.8,
+    PRESSURE_DISSIPATION: 0.8,
     PRESSURE_ITERATIONS: 25,
     CURL: 30,
-    SPLAT_RADIUS: 0.005
+    SPLAT_RADIUS: 0.0025
 }
 
-var gui = new dat.GUI({ width: 270 });
-gui.add(config, 'TEXTURE_DOWNSAMPLE', { Full: 0, Half: 1, Quarter: 2 }).name('resolution').onFinishChange(initFramebuffers);
-gui.add(config, 'DENSITY_DISSIPATION', 0.9, 1.0).name('density diffusion');
-gui.add(config, 'VELOCITY_DISSIPATION', 0.9, 1.0).name('velocity diffusion');
-gui.add(config, 'PRESSURE_CONCENTRATION', 0.0, 1.0).name('jelly');
-gui.add(config, 'PRESSURE_ITERATIONS', 1, 60).name('iterations');
-gui.add(config, 'CURL', 0, 50).name('vorticity').step(1);
-gui.add(config, 'SPLAT_RADIUS', 0.0001, 0.01).name('splat radius');
+let pointers = [];
+let splatStack = [];
 
-let github = gui.add({ fun : function () { window.open('https://github.com/PavelDoGreat/WebGL-Fluid-Simulation'); } }, 'fun').name('Github');
-github.__li.className = 'cr function bigFont';
-github.__li.style.borderLeft = '3px solid #8C8C8C';
-let githubIcon = document.createElement('span');
-github.domElement.parentElement.appendChild(githubIcon);
-githubIcon.className = 'icon github';
+const  { gl, ext, support_linear_float } = getWebGLContext(canvas);
+startGUI();
 
-let twitter = gui.add({ fun : function () { window.open('https://twitter.com/PavelDoGreat'); } }, 'fun').name('Twitter');
-twitter.__li.className = 'cr function bigFont';
-twitter.__li.style.borderLeft = '3px solid #8C8C8C';
-let twitterIcon = document.createElement('span');
-twitter.domElement.parentElement.appendChild(twitterIcon);
-twitterIcon.className = 'icon twitter';
+function getWebGLContext (canvas) {
+    const params = { alpha: false, depth: false, stencil: false, antialias: false };
+
+    let gl = canvas.getContext('webgl2', params);
+    const isWebGL2 = !!gl;
+    if (!isWebGL2)
+        gl = canvas.getContext('webgl', params) || canvas.getContext('experimental-webgl', params);
+
+    const halfFloat = gl.getExtension('OES_texture_half_float');
+    let support_linear_float = gl.getExtension('OES_texture_half_float_linear');
+    if (isWebGL2) {
+        gl.getExtension('EXT_color_buffer_float');
+        support_linear_float = gl.getExtension('OES_texture_float_linear');
+    }
+
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);
+
+    const internalFormat = isWebGL2 ? gl.RGBA16F : gl.RGBA;
+    const internalFormatRG = isWebGL2 ? gl.RG16F : gl.RGBA;
+    const formatRG = isWebGL2 ? gl.RG : gl.RGBA;
+    const texType = isWebGL2 ? gl.HALF_FLOAT : halfFloat.HALF_FLOAT_OES;
+
+    return {
+        gl,
+        ext: {
+            internalFormat,
+            internalFormatRG,
+            formatRG,
+            texType
+        },
+        support_linear_float
+    };
+}
+
+function startGUI () {
+    var gui = new dat.GUI({ width: 300 });
+    gui.add(config, 'TEXTURE_DOWNSAMPLE', { Full: 0, Half: 1, Quarter: 2 }).name('resolution').onFinishChange(initFramebuffers);
+    gui.add(config, 'DENSITY_DISSIPATION', 0.9, 1.0).name('density diffusion');
+    gui.add(config, 'VELOCITY_DISSIPATION', 0.9, 1.0).name('velocity diffusion');
+    gui.add(config, 'PRESSURE_DISSIPATION', 0.0, 1.0).name('pressure diffusion');
+    gui.add(config, 'PRESSURE_ITERATIONS', 1, 60).name('iterations');
+    gui.add(config, 'CURL', 0, 50).name('vorticity').step(1);
+    gui.add(config, 'SPLAT_RADIUS', 0.0001, 0.01).name('splat radius');
+
+    let randomSplats = gui.add({ fun: () => {
+            splatStack.push(parseInt(Math.random() * 20) + 5);
+        }
+    }, 'fun').name('Random splats');
+
+    let github = gui.add({ fun : () => { window.open('https://github.com/PavelDoGreat/WebGL-Fluid-Simulation'); } }, 'fun').name('Github');
+    github.__li.className = 'cr function bigFont';
+    github.__li.style.borderLeft = '3px solid #8C8C8C';
+    let githubIcon = document.createElement('span');
+    github.domElement.parentElement.appendChild(githubIcon);
+    githubIcon.className = 'icon github';
+
+    let twitter = gui.add({ fun : () => { window.open('https://twitter.com/PavelDoGreat'); } }, 'fun').name('Twitter');
+    twitter.__li.className = 'cr function bigFont';
+    twitter.__li.style.borderLeft = '3px solid #8C8C8C';
+    let twitterIcon = document.createElement('span');
+    twitter.domElement.parentElement.appendChild(twitterIcon);
+    twitterIcon.className = 'icon twitter';
+
+    gui.close();
+}
+
+function pointerPrototype () {
+    this.id = -1;
+    this.x = 0;
+    this.y = 0;
+    this.dx = 0;
+    this.dy = 0;
+    this.down = false;
+    this.moved = false;
+    this.color = [30, 0, 300];
+}
+
+pointers.push(new pointerPrototype());
 
 class GLProgram {
     constructor (vertexShader, fragmentShader) {
@@ -337,23 +384,39 @@ const gradientSubtractShader = compileShader(gl.FRAGMENT_SHADER, `
     }
 `);
 
-const blit = (() => {
-    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, -1, 1, 1, 1, 1, -1]), gl.STATIC_DRAW);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer());
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array([0, 1, 2, 0, 2, 3]), gl.STATIC_DRAW);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(0);
+let textureWidth;
+let textureHeight;
+let density;
+let velocity;
+let divergence;
+let curl;
+let pressure;
+initFramebuffers();
 
-    return (destination) => {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, destination);
-        gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
-    }
-})();
+const clearProgram = new GLProgram(baseVertexShader, clearShader);
+const displayProgram = new GLProgram(baseVertexShader, displayShader);
+const splatProgram = new GLProgram(baseVertexShader, splatShader);
+const advectionProgram = new GLProgram(baseVertexShader, support_linear_float ? advectionShader : advectionManualFilteringShader);
+const divergenceProgram = new GLProgram(baseVertexShader, divergenceShader);
+const curlProgram = new GLProgram(baseVertexShader, curlShader);
+const vorticityProgram = new GLProgram(baseVertexShader, vorticityShader);
+const pressureProgram = new GLProgram(baseVertexShader, pressureShader);
+const gradienSubtractProgram = new GLProgram(baseVertexShader, gradientSubtractShader);
 
-function clear (target) {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, target);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+function initFramebuffers () {
+    textureWidth = gl.drawingBufferWidth >> config.TEXTURE_DOWNSAMPLE;
+    textureHeight = gl.drawingBufferHeight >> config.TEXTURE_DOWNSAMPLE;
+
+    const iFormat = ext.internalFormat;
+    const iFormatRG = ext.internalFormatRG;
+    const formatRG = ext.formatRG;
+    const texType = ext.texType;
+
+    density    = createDoubleFBO(0, textureWidth, textureHeight, iFormat  , gl.RGBA , texType, support_linear_float ? gl.LINEAR : gl.NEAREST);
+    velocity   = createDoubleFBO(2, textureWidth, textureHeight, iFormatRG, formatRG, texType, support_linear_float ? gl.LINEAR : gl.NEAREST);
+    divergence = createFBO      (4, textureWidth, textureHeight, iFormatRG, formatRG, texType, gl.NEAREST);
+    curl       = createFBO      (5, textureWidth, textureHeight, iFormatRG, formatRG, texType, gl.NEAREST);
+    pressure   = createDoubleFBO(6, textureWidth, textureHeight, iFormatRG, formatRG, texType, gl.NEAREST);
 }
 
 function createFBO (texId, w, h, internalFormat, format, type, param) {
@@ -394,66 +457,22 @@ function createDoubleFBO (texId, w, h, internalFormat, format, type, param) {
     }
 }
 
-let textureWidth;
-let textureHeight;
-let density;
-let velocity;
-let divergence;
-let curl;
-let pressure;
+const blit = (() => {
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, -1, 1, 1, 1, 1, -1]), gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array([0, 1, 2, 0, 2, 3]), gl.STATIC_DRAW);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(0);
 
-function initFramebuffers () {
-    textureWidth = gl.drawingBufferWidth >> config.TEXTURE_DOWNSAMPLE;
-    textureHeight = gl.drawingBufferHeight >> config.TEXTURE_DOWNSAMPLE;
-
-    const internalFormat = isWebGL2 ? gl.RGBA16F : gl.RGBA;
-    const internalFormatRG = isWebGL2 ? gl.RG16F : gl.RGBA;
-    const formatRG = isWebGL2 ? gl.RG : gl.RGBA;
-    const texType = isWebGL2 ? gl.HALF_FLOAT : halfFloat.HALF_FLOAT_OES;
-
-    density    = createDoubleFBO(0, textureWidth, textureHeight, internalFormat  , gl.RGBA , texType, support_linear_float ? gl.LINEAR : gl.NEAREST);
-    velocity   = createDoubleFBO(2, textureWidth, textureHeight, internalFormatRG, formatRG, texType, support_linear_float ? gl.LINEAR : gl.NEAREST);
-    divergence = createFBO      (4, textureWidth, textureHeight, internalFormatRG, formatRG, texType, gl.NEAREST);
-    curl       = createFBO      (5, textureWidth, textureHeight, internalFormatRG, formatRG, texType, gl.NEAREST);
-    pressure   = createDoubleFBO(6, textureWidth, textureHeight, internalFormatRG, formatRG, texType, gl.NEAREST);
-}
-
-initFramebuffers();
-
-const clearProgram = new GLProgram(baseVertexShader, clearShader);
-const displayProgram = new GLProgram(baseVertexShader, displayShader);
-const splatProgram = new GLProgram(baseVertexShader, splatShader);
-const advectionProgram = new GLProgram(baseVertexShader, support_linear_float ? advectionShader : advectionManualFilteringShader);
-const divergenceProgram = new GLProgram(baseVertexShader, divergenceShader);
-const curlProgram = new GLProgram(baseVertexShader, curlShader);
-const vorticityProgram = new GLProgram(baseVertexShader, vorticityShader);
-const pressureProgram = new GLProgram(baseVertexShader, pressureShader);
-const gradienSubtractProgram = new GLProgram(baseVertexShader, gradientSubtractShader);
-
-function pointerPrototype () {
-    this.id = -1;
-    this.x = 0;
-    this.y = 0;
-    this.dx = 0;
-    this.dy = 0;
-    this.down = false;
-    this.moved = false;
-    this.color = [30, 0, 300];
-}
-
-let pointers = [];
-pointers.push(new pointerPrototype());
-
-for (let i = 0; i < 10; i++) {
-    const color = [Math.random() * 10, Math.random() * 10, Math.random() * 10];
-    const x = canvas.width * Math.random();
-    const y = canvas.height * Math.random();
-    const dx = 1000 * (Math.random() - 0.5);
-    const dy = 1000 * (Math.random() - 0.5);
-    splat(x, y, dx, dy, color);
-}
+    return (destination) => {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, destination);
+        gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+    }
+})();
 
 let lastTime = Date.now();
+multipleSplats(parseInt(Math.random() * 20) + 5);
 update();
 
 function update () {
@@ -463,6 +482,9 @@ function update () {
     lastTime = Date.now();
 
     gl.viewport(0, 0, textureWidth, textureHeight);
+
+    if (splatStack.length > 0)
+        multipleSplats(splatStack.pop());
 
     advectionProgram.bind();
     gl.uniform2f(advectionProgram.uniforms.texelSize, 1.0 / textureWidth, 1.0 / textureHeight);
@@ -507,12 +529,12 @@ function update () {
     blit(divergence[1]);
 
     clearProgram.bind();
-    
+
     let pressureTexId = pressure.first[2];
     gl.activeTexture(gl.TEXTURE0 + pressureTexId);
     gl.bindTexture(gl.TEXTURE_2D, pressure.first[0]);
     gl.uniform1i(clearProgram.uniforms.uTexture, pressureTexId);
-    gl.uniform1f(clearProgram.uniforms.value, config.PRESSURE_CONCENTRATION);
+    gl.uniform1f(clearProgram.uniforms.value, config.PRESSURE_DISSIPATION);
     blit(pressure.second[1]);
     pressure.swap();
 
@@ -557,6 +579,17 @@ function splat (x, y, dx, dy, color) {
     gl.uniform3f(splatProgram.uniforms.color, color[0] * 0.3, color[1] * 0.3, color[2] * 0.3);
     blit(density.second[1]);
     density.swap();
+}
+
+function multipleSplats (amount) {
+    for (let i = 0; i < amount; i++) {
+        const color = [Math.random() * 10, Math.random() * 10, Math.random() * 10];
+        const x = canvas.width * Math.random();
+        const y = canvas.height * Math.random();
+        const dx = 1000 * (Math.random() - 0.5);
+        const dy = 1000 * (Math.random() - 0.5);
+        splat(x, y, dx, dy, color);
+    }
 }
 
 function resizeCanvas () {
