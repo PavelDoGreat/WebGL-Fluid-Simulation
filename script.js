@@ -20,7 +20,6 @@ var splatStack = [];
 var ref = getWebGLContext(canvas);
 var gl = ref.gl;
 var ext = ref.ext;
-var support_linear_float = ref.support_linear_float;
 startGUI();
 
 function getWebGLContext (canvas) {
@@ -43,7 +42,7 @@ function getWebGLContext (canvas) {
     var internalFormat = isWebGL2 ? gl.RGBA16F : gl.RGBA;
     var internalFormatRG = isWebGL2 ? gl.RG16F : gl.RGBA;
     var formatRG = isWebGL2 ? gl.RG : gl.RGBA;
-    var texType = isWebGL2 ? gl.HALF_FLOAT : halfFloat.HALF_FLOAT_OES;
+    var halfFloatTexType = isWebGL2 ? gl.HALF_FLOAT : halfFloat.HALF_FLOAT_OES;
 
     return {
         gl: gl,
@@ -51,9 +50,9 @@ function getWebGLContext (canvas) {
             internalFormat: internalFormat,
             internalFormatRG: internalFormatRG,
             formatRG: formatRG,
-            texType: texType
-        },
-        support_linear_float: support_linear_float
+            halfFloatTexType: halfFloatTexType,
+            support_linear_float: support_linear_float
+        }
     };
 }
 
@@ -171,7 +170,7 @@ initFramebuffers();
 var clearProgram = new GLProgram(baseVertexShader, clearShader);
 var displayProgram = new GLProgram(baseVertexShader, displayShader);
 var splatProgram = new GLProgram(baseVertexShader, splatShader);
-var advectionProgram = new GLProgram(baseVertexShader, support_linear_float ? advectionShader : advectionManualFilteringShader);
+var advectionProgram = new GLProgram(baseVertexShader, ext.support_linear_float ? advectionShader : advectionManualFilteringShader);
 var divergenceProgram = new GLProgram(baseVertexShader, divergenceShader);
 var curlProgram = new GLProgram(baseVertexShader, curlShader);
 var vorticityProgram = new GLProgram(baseVertexShader, vorticityShader);
@@ -185,10 +184,10 @@ function initFramebuffers () {
     var iFormat = ext.internalFormat;
     var iFormatRG = ext.internalFormatRG;
     var formatRG = ext.formatRG;
-    var texType = ext.texType;
+    var texType = ext.halfFloatTexType;
 
-    density    = createDoubleFBO(0, textureWidth, textureHeight, iFormat  , gl.RGBA , texType, support_linear_float ? gl.LINEAR : gl.NEAREST);
-    velocity   = createDoubleFBO(2, textureWidth, textureHeight, iFormatRG, formatRG, texType, support_linear_float ? gl.LINEAR : gl.NEAREST);
+    density    = createDoubleFBO(0, textureWidth, textureHeight, iFormat  , gl.RGBA , texType, ext.support_linear_float ? gl.LINEAR : gl.NEAREST);
+    velocity   = createDoubleFBO(2, textureWidth, textureHeight, iFormatRG, formatRG, texType, ext.support_linear_float ? gl.LINEAR : gl.NEAREST);
     divergence = createFBO      (4, textureWidth, textureHeight, iFormatRG, formatRG, texType, gl.NEAREST);
     curl       = createFBO      (5, textureWidth, textureHeight, iFormatRG, formatRG, texType, gl.NEAREST);
     pressure   = createDoubleFBO(6, textureWidth, textureHeight, iFormatRG, formatRG, texType, gl.NEAREST);
@@ -210,6 +209,10 @@ function createFBO (texId, w, h, internalFormat, format, type, param) {
     gl.viewport(0, 0, w, h);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
+    var status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+    if (status != gl.FRAMEBUFFER_COMPLETE)
+        { ga('send', 'event', 'app', 'init', status); }
+
     return [texture, fbo, texId];
 }
 
@@ -224,7 +227,7 @@ function createDoubleFBO (texId, w, h, internalFormat, format, type, param) {
         get second () {
             return fbo2;
         },
-        swap: function () {
+        swap: function swap () {
             var temp = fbo1;
             fbo1 = fbo2;
             fbo2 = temp;
@@ -317,10 +320,10 @@ function update () {
     gl.uniform2f(pressureProgram.uniforms.texelSize, 1.0 / textureWidth, 1.0 / textureHeight);
     gl.uniform1i(pressureProgram.uniforms.uDivergence, divergence[2]);
     pressureTexId = pressure.first[2];
+    gl.uniform1i(pressureProgram.uniforms.uPressure, pressureTexId);
     gl.activeTexture(gl.TEXTURE0 + pressureTexId);
     for (var i$1 = 0; i$1 < config.PRESSURE_ITERATIONS; i$1++) {
         gl.bindTexture(gl.TEXTURE_2D, pressure.first[0]);
-        gl.uniform1i(pressureProgram.uniforms.uPressure, pressureTexId);
         blit(pressure.second[1]);
         pressure.swap();
     }
