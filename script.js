@@ -28,11 +28,14 @@ function getWebGLContext (canvas) {
     if (!isWebGL2)
         gl = canvas.getContext('webgl', params) || canvas.getContext('experimental-webgl', params);
 
-    const halfFloat = gl.getExtension('OES_texture_half_float');
-    let support_linear_float = gl.getExtension('OES_texture_half_float_linear');
+    let halfFloat;
+    let support_linear_float;
     if (isWebGL2) {
         gl.getExtension('EXT_color_buffer_float');
         support_linear_float = gl.getExtension('OES_texture_float_linear');
+    } else {
+        halfFloat = gl.getExtension('OES_texture_half_float');
+        support_linear_float = gl.getExtension('OES_texture_half_float_linear');
     }
 
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
@@ -436,8 +439,12 @@ function createFBO (texId, w, h, internalFormat, format, type, param) {
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
-    if (status != gl.FRAMEBUFFER_COMPLETE)
-        ga('send', 'event', 'app', 'init', status);
+    if (status != gl.FRAMEBUFFER_COMPLETE) {
+        ga('send', 'pageview', {
+            'dimension1': status,
+            'dimension2': isWebGL2
+        });
+    }
 
     return [texture, fbo, texId];
 }
