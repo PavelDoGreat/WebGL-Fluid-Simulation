@@ -42,10 +42,24 @@ function getWebGLContext (canvas) {
 
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
+    var halfFloatTexType = isWebGL2 ? gl.HALF_FLOAT : halfFloat.HALF_FLOAT_OES;
     var internalFormat = isWebGL2 ? gl.RGBA16F : gl.RGBA;
     var internalFormatRG = isWebGL2 ? gl.RG16F : gl.RGBA;
-    var formatRG = isWebGL2 ? gl.RG : gl.RGBA;
-    var halfFloatTexType = isWebGL2 ? gl.HALF_FLOAT : halfFloat.HALF_FLOAT_OES;
+    var formatRG         = isWebGL2 ? gl.RG : gl.RGBA;
+
+    if (isWebGL2) {
+        if (!supportRenderTextureFormat(gl, internalFormatRG, formatRG, halfFloatTexType)) {
+            internalFormatRG = gl.RGBA16F;
+            formatRG = gl.RGBA;
+
+            ga('send', 'event', 'webgl2', 'rg not supported');
+            if (!supportRenderTextureFormat(gl, internalFormatRG, formatRG, halfFloatTexType))
+                { ga('send', 'event', 'webgl2', 'rgba not supported'); }
+        }
+    } else {
+        if (!supportRenderTextureFormat(gl, internalFormatRG, formatRG, halfFloatTexType))
+            { ga('send', 'event', 'webgl', 'rgba not supported'); }
+    }
 
     return {
         gl: gl,
@@ -57,6 +71,25 @@ function getWebGLContext (canvas) {
             support_linear_float: support_linear_float
         }
     };
+}
+
+function supportRenderTextureFormat (gl, internalFormat, format, type) {
+    var texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, 4, 4, 0, format, type, null);
+
+    var fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+
+    var status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+    if (status != gl.FRAMEBUFFER_COMPLETE)
+        { return false; }
+    return true;
 }
 
 function startGUI () {
@@ -211,14 +244,6 @@ function createFBO (texId, w, h, internalFormat, format, type, param) {
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
     gl.viewport(0, 0, w, h);
     gl.clear(gl.COLOR_BUFFER_BIT);
-
-    var status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
-    if (status != gl.FRAMEBUFFER_COMPLETE) {
-        ga('send', 'pageview', {
-            'dimension1': status,
-            'dimension2': isWebGL2
-        });
-    }
 
     return [texture, fbo, texId];
 }
