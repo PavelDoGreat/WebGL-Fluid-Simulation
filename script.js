@@ -60,9 +60,8 @@ function getWebGLContext (canvas) {
 
     if (formatRGBA == null)
         ga('send', 'event', isWebGL2 ? 'webgl2' : 'webgl', 'not supported');
-
-    if (halfFloat == null)
-        ga('send', 'event', isWebGL2 ? 'webgl2' : 'webgl', 'halfTexture not supported');
+    else
+        ga('send', 'event', isWebGL2 ? 'webgl2' : 'webgl', 'supported');
 
     return {
         gl,
