@@ -125,24 +125,39 @@ function startGUI () {
     gui.add(config, 'CURL', 0, 50).name('vorticity').step(1);
     gui.add(config, 'SPLAT_RADIUS', 0.0001, 0.01).name('splat radius');
 
-    let randomSplats = gui.add({ fun: () => {
-            splatStack.push(parseInt(Math.random() * 20) + 5);
-        }
-    }, 'fun').name('Random splats');
+    gui.add({ fun: () => {
+        splatStack.push(parseInt(Math.random() * 20) + 5);
+    } }, 'fun').name('Random splats');
 
-    let github = gui.add({ fun : () => { window.open('https://github.com/PavelDoGreat/WebGL-Fluid-Simulation'); } }, 'fun').name('Github');
+    let github = gui.add({ fun : () => {
+        window.open('https://github.com/PavelDoGreat/WebGL-Fluid-Simulation');
+        ga('send', 'event', 'link button', 'github');
+    } }, 'fun').name('Github');
     github.__li.className = 'cr function bigFont';
     github.__li.style.borderLeft = '3px solid #8C8C8C';
     let githubIcon = document.createElement('span');
     github.domElement.parentElement.appendChild(githubIcon);
     githubIcon.className = 'icon github';
 
-    let twitter = gui.add({ fun : () => { window.open('https://twitter.com/PavelDoGreat'); } }, 'fun').name('Twitter');
+    let twitter = gui.add({ fun : () => {
+        window.open('https://twitter.com/PavelDoGreat');
+        ga('send', 'event', 'link button', 'twitter');
+    } }, 'fun').name('Twitter');
     twitter.__li.className = 'cr function bigFont';
     twitter.__li.style.borderLeft = '3px solid #8C8C8C';
     let twitterIcon = document.createElement('span');
     twitter.domElement.parentElement.appendChild(twitterIcon);
     twitterIcon.className = 'icon twitter';
+
+    let app = gui.add({ fun : () => {
+        window.open('https://play.google.com/store/apps/details?id=games.paveldogreat.fluidsim');
+        ga('send', 'event', 'link button', 'app');
+    } }, 'fun').name('Check out new improved version');
+    app.__li.className = 'cr function appBigFont';
+    app.__li.style.borderLeft = '3px solid #00FF7F';
+    let appIcon = document.createElement('span');
+    app.domElement.parentElement.appendChild(appIcon);
+    appIcon.className = 'icon app';
 
     gui.close();
 }
