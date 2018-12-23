@@ -5,19 +5,24 @@ canvas.width = canvas.clientWidth;
 canvas.height = canvas.clientHeight;
 
 let config = {
-    TEXTURE_DOWNSAMPLE: 1,
-    DENSITY_DISSIPATION: 0.98,
-    VELOCITY_DISSIPATION: 0.99,
+    SIM_RESOLUTION: 128,
+    DYE_RESOLUTION: 512,
+    DENSITY_DISSIPATION: 0.97,
+    VELOCITY_DISSIPATION: 0.98,
     PRESSURE_DISSIPATION: 0.8,
-    PRESSURE_ITERATIONS: 25,
+    PRESSURE_ITERATIONS: 20,
     CURL: 30,
-    SPLAT_RADIUS: 0.005
+    SPLAT_RADIUS: 0.5,
+    SHADING: true
 }
+
+if (isMobile())
+    config.DYE_RESOLUTION = 256;
 
 let pointers = [];
 let splatStack = [];
 
-const  { gl, ext } = getWebGLContext(canvas);
+const { gl, ext } = getWebGLContext(canvas);
 startGUI();
 
 function getWebGLContext (canvas) {
@@ -117,13 +122,15 @@ function supportRenderTextureFormat (gl, internalFormat, format, type) {
 
 function startGUI () {
     var gui = new dat.GUI({ width: 300 });
-    gui.add(config, 'TEXTURE_DOWNSAMPLE', { Full: 0, Half: 1, Quarter: 2 }).name('resolution').onFinishChange(initFramebuffers);
+    gui.add(config, 'SIM_RESOLUTION', { '32': 32, '64': 64, '128': 128, '256': 256 }).name('sim resolution').onFinishChange(initFramebuffers);
+    gui.add(config, 'DYE_RESOLUTION', { '128': 128, '256': 256, '512': 512, '1024': 1024 }).name('dye resolution').onFinishChange(initFramebuffers);
     gui.add(config, 'DENSITY_DISSIPATION', 0.9, 1.0).name('density diffusion');
     gui.add(config, 'VELOCITY_DISSIPATION', 0.9, 1.0).name('velocity diffusion');
     gui.add(config, 'PRESSURE_DISSIPATION', 0.0, 1.0).name('pressure diffusion');
-    gui.add(config, 'PRESSURE_ITERATIONS', 1, 60).name('iterations');
+    // gui.add(config, 'PRESSURE_ITERATIONS', 1, 60).name('iterations');
     gui.add(config, 'CURL', 0, 50).name('vorticity').step(1);
-    gui.add(config, 'SPLAT_RADIUS', 0.0001, 0.01).name('splat radius');
+    gui.add(config, 'SPLAT_RADIUS', 0.01, 1.0).name('splat radius');
+    gui.add(config, 'SHADING').name('shading');
 
     gui.add({ fun: () => {
         splatStack.push(parseInt(Math.random() * 20) + 5);
@@ -159,7 +166,12 @@ function startGUI () {
     app.domElement.parentElement.appendChild(appIcon);
     appIcon.className = 'icon app';
 
-    gui.close();
+    if (isMobile())
+        gui.close();
+}
+
+function isMobile () {
+    return /Mobi|Android/i.test(navigator.userAgent);
 }
 
 function pointerPrototype () {
@@ -257,6 +269,38 @@ const displayShader = compileShader(gl.FRAGMENT_SHADER, `
     }
 `);
 
+const displayShadingShader = compileShader(gl.FRAGMENT_SHADER, `
+    precision highp float;
+    precision mediump sampler2D;
+
+    varying vec2 vUv;
+    varying vec2 vL;
+    varying vec2 vR;
+    varying vec2 vT;
+    varying vec2 vB;
+    uniform sampler2D uTexture;
+    uniform vec2 texelSize;
+
+    void main () {
+        vec3 L = texture2D(uTexture, vL).rgb;
+        vec3 R = texture2D(uTexture, vR).rgb;
+        vec3 T = texture2D(uTexture, vT).rgb;
+        vec3 B = texture2D(uTexture, vB).rgb;
+        vec3 C = texture2D(uTexture, vUv).rgb;
+
+        float dx = length(R) - length(L);
+        float dy = length(T) - length(B);
+
+        vec3 n = normalize(vec3(dx, dy, length(texelSize)));
+        vec3 l = vec3(0.0, 0.0, 1.0);
+
+        float diffuse = clamp(dot(n, l) + 0.7, 0.7, 1.0);
+        C.rgb *= diffuse;
+
+        gl_FragColor = vec4(C, 1.0);
+    }
+`);
+
 const splatShader = compileShader(gl.FRAGMENT_SHADER, `
     precision highp float;
     precision mediump sampler2D;
@@ -302,7 +346,7 @@ const advectionManualFilteringShader = compileShader(gl.FRAGMENT_SHADER, `
     }
 
     void main () {
-        vec2 coord = gl_FragCoord.xy - dt * texture2D(uVelocity, vUv).xy;
+        vec2 coord = gl_FragCoord.xy - dt * bilerp(uVelocity, vUv).xy;
         gl_FragColor = dissipation * bilerp(uSource, coord);
         gl_FragColor.a = 1.0;
     }
@@ -373,7 +417,7 @@ const curlShader = compileShader(gl.FRAGMENT_SHADER, `
         float T = texture2D(uVelocity, vT).x;
         float B = texture2D(uVelocity, vB).x;
         float vorticity = R - L - T + B;
-        gl_FragColor = vec4(vorticity, 0.0, 0.0, 1.0);
+        gl_FragColor = vec4(0.5 * vorticity, 0.0, 0.0, 1.0);
     }
 `);
 
@@ -382,6 +426,8 @@ const vorticityShader = compileShader(gl.FRAGMENT_SHADER, `
     precision mediump sampler2D;
 
     varying vec2 vUv;
+    varying vec2 vL;
+    varying vec2 vR;
     varying vec2 vT;
     varying vec2 vB;
     uniform sampler2D uVelocity;
@@ -390,11 +436,17 @@ const vorticityShader = compileShader(gl.FRAGMENT_SHADER, `
     uniform float dt;
 
     void main () {
+        float L = texture2D(uCurl, vL).x;
+        float R = texture2D(uCurl, vR).x;
         float T = texture2D(uCurl, vT).x;
         float B = texture2D(uCurl, vB).x;
         float C = texture2D(uCurl, vUv).x;
-        vec2 force = vec2(abs(T) - abs(B), 0.0);
-        force *= 1.0 / length(force + 0.00001) * curl * C;
+
+        vec2 force = 0.5 * vec2(abs(T) - abs(B), abs(R) - abs(L));
+        force /= length(force) + 0.0001;
+        force *= curl * C;
+        force.y *= -1.0;
+
         vec2 vel = texture2D(uVelocity, vUv).xy;
         gl_FragColor = vec4(vel + force * dt, 0.0, 1.0);
     }
@@ -457,39 +509,74 @@ const gradientSubtractShader = compileShader(gl.FRAGMENT_SHADER, `
     }
 `);
 
-let textureWidth;
-let textureHeight;
+const blit = (() => {
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, -1, 1, 1, 1, 1, -1]), gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array([0, 1, 2, 0, 2, 3]), gl.STATIC_DRAW);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(0);
+
+    return (destination) => {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, destination);
+        gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+    }
+})();
+
+let simWidth;
+let simHeight;
+let dyeWidth;
+let dyeHeight;
 let density;
 let velocity;
 let divergence;
 let curl;
 let pressure;
-initFramebuffers();
 
-const clearProgram = new GLProgram(baseVertexShader, clearShader);
-const displayProgram = new GLProgram(baseVertexShader, displayShader);
-const splatProgram = new GLProgram(baseVertexShader, splatShader);
-const advectionProgram = new GLProgram(baseVertexShader, ext.supportLinearFiltering ? advectionShader : advectionManualFilteringShader);
-const divergenceProgram = new GLProgram(baseVertexShader, divergenceShader);
-const curlProgram = new GLProgram(baseVertexShader, curlShader);
-const vorticityProgram = new GLProgram(baseVertexShader, vorticityShader);
-const pressureProgram = new GLProgram(baseVertexShader, pressureShader);
+const clearProgram           = new GLProgram(baseVertexShader, clearShader);
+const displayProgram         = new GLProgram(baseVertexShader, displayShader);
+const displayShadingProgram  = new GLProgram(baseVertexShader, displayShadingShader);
+const splatProgram           = new GLProgram(baseVertexShader, splatShader);
+const advectionProgram       = new GLProgram(baseVertexShader, ext.supportLinearFiltering ? advectionShader : advectionManualFilteringShader);
+const divergenceProgram      = new GLProgram(baseVertexShader, divergenceShader);
+const curlProgram            = new GLProgram(baseVertexShader, curlShader);
+const vorticityProgram       = new GLProgram(baseVertexShader, vorticityShader);
+const pressureProgram        = new GLProgram(baseVertexShader, pressureShader);
 const gradienSubtractProgram = new GLProgram(baseVertexShader, gradientSubtractShader);
 
 function initFramebuffers () {
-    textureWidth = gl.drawingBufferWidth >> config.TEXTURE_DOWNSAMPLE;
-    textureHeight = gl.drawingBufferHeight >> config.TEXTURE_DOWNSAMPLE;
+    let simRes = getResolution(config.SIM_RESOLUTION);
+    let dyeRes = getResolution(config.DYE_RESOLUTION);
+
+    simWidth  = simRes.width;
+    simHeight = simRes.height;
+    dyeWidth  = dyeRes.width;
+    dyeHeight = dyeRes.height;
 
     const texType = ext.halfFloatTexType;
-    const rgba = ext.formatRGBA;
-    const rg   = ext.formatRG;
-    const r    = ext.formatR;
+    const rgba    = ext.formatRGBA;
+    const rg      = ext.formatRG;
+    const r       = ext.formatR;
 
-    density    = createDoubleFBO(2, textureWidth, textureHeight, rgba.internalFormat, rgba.format, texType, ext.supportLinearFiltering ? gl.LINEAR : gl.NEAREST);
-    velocity   = createDoubleFBO(0, textureWidth, textureHeight, rg.internalFormat, rg.format, texType, ext.supportLinearFiltering ? gl.LINEAR : gl.NEAREST);
-    divergence = createFBO      (4, textureWidth, textureHeight, r.internalFormat, r.format, texType, gl.NEAREST);
-    curl       = createFBO      (5, textureWidth, textureHeight, r.internalFormat, r.format, texType, gl.NEAREST);
-    pressure   = createDoubleFBO(6, textureWidth, textureHeight, r.internalFormat, r.format, texType, gl.NEAREST);
+    density    = createDoubleFBO(2, dyeWidth, dyeHeight, rgba.internalFormat, rgba.format, texType, ext.supportLinearFiltering ? gl.LINEAR : gl.NEAREST);
+    velocity   = createDoubleFBO(0, simWidth, simHeight, rg.internalFormat, rg.format, texType, ext.supportLinearFiltering ? gl.LINEAR : gl.NEAREST);
+    divergence = createFBO      (4, simWidth, simHeight, r.internalFormat, r.format, texType, gl.NEAREST);
+    curl       = createFBO      (5, simWidth, simHeight, r.internalFormat, r.format, texType, gl.NEAREST);
+    pressure   = createDoubleFBO(6, simWidth, simHeight, r.internalFormat, r.format, texType, gl.NEAREST);
+}
+
+function getResolution (resolution) {
+    let aspectRatio = gl.drawingBufferWidth / gl.drawingBufferHeight;
+    if (aspectRatio < 1)
+        aspectRatio = 1.0 / aspectRatio;
+
+    let max = resolution * aspectRatio;
+    let min = resolution;
+
+    if (gl.drawingBufferWidth > gl.drawingBufferHeight)
+        return { width: max, height: min };
+    else
+        return { width: min, height: max };
 }
 
 function createFBO (texId, w, h, internalFormat, format, type, param) {
@@ -508,7 +595,15 @@ function createFBO (texId, w, h, internalFormat, format, type, param) {
     gl.viewport(0, 0, w, h);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    return [texture, fbo, texId];
+    return {
+        texture,
+        fbo,
+        texId,
+        internalFormat,
+        format,
+        type,
+        param
+    };
 }
 
 function createDoubleFBO (texId, w, h, internalFormat, format, type, param) {
@@ -526,52 +621,48 @@ function createDoubleFBO (texId, w, h, internalFormat, format, type, param) {
             let temp = fbo1;
             fbo1 = fbo2;
             fbo2 = temp;
+        },
+        set read (value) {
+            fbo1 = value;
+        },
+        set write (value) {
+            fbo2 = value;
         }
     }
 }
 
-const blit = (() => {
-    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, -1, 1, 1, 1, 1, -1]), gl.STATIC_DRAW);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer());
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array([0, 1, 2, 0, 2, 3]), gl.STATIC_DRAW);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(0);
-
-    return (destination) => {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, destination);
-        gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
-    }
-})();
-
-let lastTime = Date.now();
+initFramebuffers();
 multipleSplats(parseInt(Math.random() * 20) + 5);
+
 update();
 
 function update () {
     resizeCanvas();
+    step(0.016);
+    render();
+    requestAnimationFrame(update);
+}
 
-    const dt = Math.min((Date.now() - lastTime) / 1000, 0.016);
-    lastTime = Date.now();
-
-    gl.viewport(0, 0, textureWidth, textureHeight);
-
+function step (dt) {
     if (splatStack.length > 0)
         multipleSplats(splatStack.pop());
 
+    gl.viewport(0, 0, simWidth, simHeight);
+
     advectionProgram.bind();
-    gl.uniform2f(advectionProgram.uniforms.texelSize, 1.0 / textureWidth, 1.0 / textureHeight);
-    gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.read[2]);
-    gl.uniform1i(advectionProgram.uniforms.uSource, velocity.read[2]);
+    gl.uniform2f(advectionProgram.uniforms.texelSize, 1.0 / simWidth, 1.0 / simHeight);
+    gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.read.texId);
+    gl.uniform1i(advectionProgram.uniforms.uSource, velocity.read.texId);
     gl.uniform1f(advectionProgram.uniforms.dt, dt);
     gl.uniform1f(advectionProgram.uniforms.dissipation, config.VELOCITY_DISSIPATION);
-    blit(velocity.write[1]);
+    blit(velocity.write.fbo);
     velocity.swap();
 
-    gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.read[2]);
-    gl.uniform1i(advectionProgram.uniforms.uSource, density.read[2]);
+    gl.viewport(0, 0, dyeWidth, dyeHeight);
+    gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.read.texId);
+    gl.uniform1i(advectionProgram.uniforms.uSource, density.read.texId);
     gl.uniform1f(advectionProgram.uniforms.dissipation, config.DENSITY_DISSIPATION);
-    blit(density.write[1]);
+    blit(density.write.fbo);
     density.swap();
 
     for (let i = 0; i < pointers.length; i++) {
@@ -582,80 +673,99 @@ function update () {
         }
     }
 
+    gl.viewport(0, 0, simWidth, simHeight);
+
     curlProgram.bind();
-    gl.uniform2f(curlProgram.uniforms.texelSize, 1.0 / textureWidth, 1.0 / textureHeight);
-    gl.uniform1i(curlProgram.uniforms.uVelocity, velocity.read[2]);
-    blit(curl[1]);
+    gl.uniform2f(curlProgram.uniforms.texelSize, 1.0 / simWidth, 1.0 / simHeight);
+    gl.uniform1i(curlProgram.uniforms.uVelocity, velocity.read.texId);
+    blit(curl.fbo);
 
     vorticityProgram.bind();
-    gl.uniform2f(vorticityProgram.uniforms.texelSize, 1.0 / textureWidth, 1.0 / textureHeight);
-    gl.uniform1i(vorticityProgram.uniforms.uVelocity, velocity.read[2]);
-    gl.uniform1i(vorticityProgram.uniforms.uCurl, curl[2]);
+    gl.uniform2f(vorticityProgram.uniforms.texelSize, 1.0 / simWidth, 1.0 / simHeight);
+    gl.uniform1i(vorticityProgram.uniforms.uVelocity, velocity.read.texId);
+    gl.uniform1i(vorticityProgram.uniforms.uCurl, curl.texId);
     gl.uniform1f(vorticityProgram.uniforms.curl, config.CURL);
     gl.uniform1f(vorticityProgram.uniforms.dt, dt);
-    blit(velocity.write[1]);
+    blit(velocity.write.fbo);
     velocity.swap();
 
     divergenceProgram.bind();
-    gl.uniform2f(divergenceProgram.uniforms.texelSize, 1.0 / textureWidth, 1.0 / textureHeight);
-    gl.uniform1i(divergenceProgram.uniforms.uVelocity, velocity.read[2]);
-    blit(divergence[1]);
+    gl.uniform2f(divergenceProgram.uniforms.texelSize, 1.0 / simWidth, 1.0 / simHeight);
+    gl.uniform1i(divergenceProgram.uniforms.uVelocity, velocity.read.texId);
+    blit(divergence.fbo);
 
     clearProgram.bind();
-    let pressureTexId = pressure.read[2];
+    let pressureTexId = pressure.read.texId;
     gl.activeTexture(gl.TEXTURE0 + pressureTexId);
-    gl.bindTexture(gl.TEXTURE_2D, pressure.read[0]);
+    gl.bindTexture(gl.TEXTURE_2D, pressure.read.texture);
     gl.uniform1i(clearProgram.uniforms.uTexture, pressureTexId);
     gl.uniform1f(clearProgram.uniforms.value, config.PRESSURE_DISSIPATION);
-    blit(pressure.write[1]);
+    blit(pressure.write.fbo);
     pressure.swap();
 
     pressureProgram.bind();
-    gl.uniform2f(pressureProgram.uniforms.texelSize, 1.0 / textureWidth, 1.0 / textureHeight);
-    gl.uniform1i(pressureProgram.uniforms.uDivergence, divergence[2]);
-    pressureTexId = pressure.read[2];
+    gl.uniform2f(pressureProgram.uniforms.texelSize, 1.0 / simWidth, 1.0 / simHeight);
+    gl.uniform1i(pressureProgram.uniforms.uDivergence, divergence.texId);
+    pressureTexId = pressure.read.texId;
     gl.uniform1i(pressureProgram.uniforms.uPressure, pressureTexId);
     gl.activeTexture(gl.TEXTURE0 + pressureTexId);
     for (let i = 0; i < config.PRESSURE_ITERATIONS; i++) {
-        gl.bindTexture(gl.TEXTURE_2D, pressure.read[0]);
-        blit(pressure.write[1]);
+        gl.bindTexture(gl.TEXTURE_2D, pressure.read.texture);
+        blit(pressure.write.fbo);
         pressure.swap();
     }
 
     gradienSubtractProgram.bind();
-    gl.uniform2f(gradienSubtractProgram.uniforms.texelSize, 1.0 / textureWidth, 1.0 / textureHeight);
-    gl.uniform1i(gradienSubtractProgram.uniforms.uPressure, pressure.read[2]);
-    gl.uniform1i(gradienSubtractProgram.uniforms.uVelocity, velocity.read[2]);
-    blit(velocity.write[1]);
+    gl.uniform2f(gradienSubtractProgram.uniforms.texelSize, 1.0 / simWidth, 1.0 / simHeight);
+    gl.uniform1i(gradienSubtractProgram.uniforms.uPressure, pressure.read.texId);
+    gl.uniform1i(gradienSubtractProgram.uniforms.uVelocity, velocity.read.texId);
+    blit(velocity.write.fbo);
     velocity.swap();
+}
 
-    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-    displayProgram.bind();
-    gl.uniform1i(displayProgram.uniforms.uTexture, density.read[2]);
+function render () {
+    let width  = gl.drawingBufferWidth;
+    let height = gl.drawingBufferHeight;
+
+    gl.viewport(0, 0, width, height);
+
+    if (config.SHADING) {
+        displayShadingProgram.bind();
+        gl.uniform2f(displayShadingProgram.uniforms.texelSize, 1.0 / width, 1.0 / height);
+        gl.uniform1i(displayShadingProgram.uniforms.uTexture, density.read.texId);
+    }
+    else {
+        displayProgram.bind();
+        gl.uniform1i(displayProgram.uniforms.uTexture, density.read.texId);
+    }
+
     blit(null);
-
-    requestAnimationFrame(update);
 }
 
 function splat (x, y, dx, dy, color) {
+    gl.viewport(0, 0, simWidth, simHeight);
     splatProgram.bind();
-    gl.uniform1i(splatProgram.uniforms.uTarget, velocity.read[2]);
+    gl.uniform1i(splatProgram.uniforms.uTarget, velocity.read.texId);
     gl.uniform1f(splatProgram.uniforms.aspectRatio, canvas.width / canvas.height);
     gl.uniform2f(splatProgram.uniforms.point, x / canvas.width, 1.0 - y / canvas.height);
     gl.uniform3f(splatProgram.uniforms.color, dx, -dy, 1.0);
-    gl.uniform1f(splatProgram.uniforms.radius, config.SPLAT_RADIUS);
-    blit(velocity.write[1]);
+    gl.uniform1f(splatProgram.uniforms.radius, config.SPLAT_RADIUS / 100.0);
+    blit(velocity.write.fbo);
     velocity.swap();
 
-    gl.uniform1i(splatProgram.uniforms.uTarget, density.read[2]);
-    gl.uniform3f(splatProgram.uniforms.color, color[0] * 0.3, color[1] * 0.3, color[2] * 0.3);
-    blit(density.write[1]);
+    gl.viewport(0, 0, dyeWidth, dyeHeight);
+    gl.uniform1i(splatProgram.uniforms.uTarget, density.read.texId);
+    gl.uniform3f(splatProgram.uniforms.color, color.r, color.g, color.b);
+    blit(density.write.fbo);
     density.swap();
 }
 
 function multipleSplats (amount) {
     for (let i = 0; i < amount; i++) {
-        const color = [Math.random() * 10, Math.random() * 10, Math.random() * 10];
+        const color = generateColor();
+        color.r *= 10.0;
+        color.g *= 10.0;
+        color.b *= 10.0;
         const x = canvas.width * Math.random();
         const y = canvas.height * Math.random();
         const dx = 1000 * (Math.random() - 0.5);
@@ -674,8 +784,8 @@ function resizeCanvas () {
 
 canvas.addEventListener('mousemove', (e) => {
     pointers[0].moved = pointers[0].down;
-    pointers[0].dx = (e.offsetX - pointers[0].x) * 10.0;
-    pointers[0].dy = (e.offsetY - pointers[0].y) * 10.0;
+    pointers[0].dx = (e.offsetX - pointers[0].x) * 5.0;
+    pointers[0].dy = (e.offsetY - pointers[0].y) * 5.0;
     pointers[0].x = e.offsetX;
     pointers[0].y = e.offsetY;
 });
@@ -686,8 +796,8 @@ canvas.addEventListener('touchmove', (e) => {
     for (let i = 0; i < touches.length; i++) {
         let pointer = pointers[i];
         pointer.moved = pointer.down;
-        pointer.dx = (touches[i].pageX - pointer.x) * 10.0;
-        pointer.dy = (touches[i].pageY - pointer.y) * 10.0;
+        pointer.dx = (touches[i].pageX - pointer.x) * 8.0;
+        pointer.dy = (touches[i].pageY - pointer.y) * 8.0;
         pointer.x = touches[i].pageX;
         pointer.y = touches[i].pageY;
     }
@@ -695,7 +805,7 @@ canvas.addEventListener('touchmove', (e) => {
 
 canvas.addEventListener('mousedown', () => {
     pointers[0].down = true;
-    pointers[0].color = [Math.random() + 0.2, Math.random() + 0.2, Math.random() + 0.2];
+    pointers[0].color = generateColor();
 });
 
 canvas.addEventListener('touchstart', (e) => {
@@ -709,7 +819,7 @@ canvas.addEventListener('touchstart', (e) => {
         pointers[i].down = true;
         pointers[i].x = touches[i].pageX;
         pointers[i].y = touches[i].pageY;
-        pointers[i].color = [Math.random() + 0.2, Math.random() + 0.2, Math.random() + 0.2];
+        pointers[i].color = generateColor();
     }
 });
 
@@ -724,3 +834,11 @@ window.addEventListener('touchend', (e) => {
             if (touches[i].identifier == pointers[j].id)
                 pointers[j].down = false;
 });
+
+function generateColor () {
+    return {
+        r: Math.random() * 0.15 + 0.05,
+        g: Math.random() * 0.15 + 0.05,
+        b: Math.random() * 0.15 + 0.05
+    };
+}
