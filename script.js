@@ -337,11 +337,7 @@ function createFBO (texId, w, h, internalFormat, format, type, param) {
     return {
         texture: texture,
         fbo: fbo,
-        texId: texId,
-        internalFormat: internalFormat,
-        format: format,
-        type: type,
-        param: param
+        texId: texId
     };
 }
 
