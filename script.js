@@ -598,11 +598,7 @@ function createFBO (texId, w, h, internalFormat, format, type, param) {
     return {
         texture,
         fbo,
-        texId,
-        internalFormat,
-        format,
-        type,
-        param
+        texId
     };
 }
 
@@ -621,12 +617,6 @@ function createDoubleFBO (texId, w, h, internalFormat, format, type, param) {
             let temp = fbo1;
             fbo1 = fbo2;
             fbo2 = temp;
-        },
-        set read (value) {
-            fbo1 = value;
-        },
-        set write (value) {
-            fbo2 = value;
         }
     }
 }
