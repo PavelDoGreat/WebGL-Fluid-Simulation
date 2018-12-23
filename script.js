@@ -159,7 +159,7 @@ function startGUI () {
     twitterIcon.className = 'icon twitter';
 
     var app = gui.add({ fun : function () {
-        window.open('https://play.google.com/store/apps/details?id=games.paveldogreat.fluidsim');
+        window.open('http://onelink.to/5b58bn');
         ga('send', 'event', 'link button', 'app');
     } }, 'fun').name('Check out new improved version');
     app.__li.className = 'cr function appBigFont';
