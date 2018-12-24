@@ -16,15 +16,18 @@ var config = {
     SHADING: true
 }
 
-if (isMobile())
-    { config.DYE_RESOLUTION = 256; }
-
 var pointers = [];
 var splatStack = [];
 
 var ref = getWebGLContext(canvas);
 var gl = ref.gl;
 var ext = ref.ext;
+
+if (isMobile())
+    { config.DYE_RESOLUTION = 256; }
+if (!ext.supportLinearFiltering)
+    { config.SHADING = false; }
+
 startGUI();
 
 function getWebGLContext (canvas) {
@@ -234,7 +237,7 @@ var displayShadingShader = compileShader(gl.FRAGMENT_SHADER, "\n    precision hi
 
 var splatShader = compileShader(gl.FRAGMENT_SHADER, "\n    precision highp float;\n    precision mediump sampler2D;\n\n    varying vec2 vUv;\n    uniform sampler2D uTarget;\n    uniform float aspectRatio;\n    uniform vec3 color;\n    uniform vec2 point;\n    uniform float radius;\n\n    void main () {\n        vec2 p = vUv - point.xy;\n        p.x *= aspectRatio;\n        vec3 splat = exp(-dot(p, p) / radius) * color;\n        vec3 base = texture2D(uTarget, vUv).xyz;\n        gl_FragColor = vec4(base + splat, 1.0);\n    }\n");
 
-var advectionManualFilteringShader = compileShader(gl.FRAGMENT_SHADER, "\n    precision highp float;\n    precision mediump sampler2D;\n\n    varying vec2 vUv;\n    uniform sampler2D uVelocity;\n    uniform sampler2D uSource;\n    uniform vec2 texelSize;\n    uniform float dt;\n    uniform float dissipation;\n\n    vec4 bilerp (in sampler2D sam, in vec2 p) {\n        vec4 st;\n        st.xy = floor(p - 0.5) + 0.5;\n        st.zw = st.xy + 1.0;\n        vec4 uv = st * texelSize.xyxy;\n        vec4 a = texture2D(sam, uv.xy);\n        vec4 b = texture2D(sam, uv.zy);\n        vec4 c = texture2D(sam, uv.xw);\n        vec4 d = texture2D(sam, uv.zw);\n        vec2 f = p - st.xy;\n        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);\n    }\n\n    void main () {\n        vec2 coord = gl_FragCoord.xy - dt * bilerp(uVelocity, vUv).xy;\n        gl_FragColor = dissipation * bilerp(uSource, coord);\n        gl_FragColor.a = 1.0;\n    }\n");
+var advectionManualFilteringShader = compileShader(gl.FRAGMENT_SHADER, "\n    precision highp float;\n    precision mediump sampler2D;\n\n    varying vec2 vUv;\n    uniform sampler2D uVelocity;\n    uniform sampler2D uSource;\n    uniform vec2 texelSize;\n    uniform vec2 dyeTexelSize;\n    uniform float dt;\n    uniform float dissipation;\n\n    vec4 bilerp (in sampler2D sam, in vec2 uv, in vec2 tsize) {\n        vec2 st = uv / tsize - 0.5;\n\n        vec2 iuv = floor(st);\n        vec2 fuv = fract(st);\n\n        vec4 a = texture2D(sam, (iuv + vec2(0.5, 0.5)) * tsize);\n        vec4 b = texture2D(sam, (iuv + vec2(1.5, 0.5)) * tsize);\n        vec4 c = texture2D(sam, (iuv + vec2(0.5, 1.5)) * tsize);\n        vec4 d = texture2D(sam, (iuv + vec2(1.5, 1.5)) * tsize);\n\n        return mix(mix(a, b, fuv.x), mix(c, d, fuv.x), fuv.y);\n    }\n\n    void main () {\n        vec2 coord = vUv - dt * bilerp(uVelocity, vUv, texelSize).xy * texelSize;\n        gl_FragColor = dissipation * bilerp(uSource, coord, dyeTexelSize);\n        gl_FragColor.a = 1.0;\n    }\n");
 
 var advectionShader = compileShader(gl.FRAGMENT_SHADER, "\n    precision highp float;\n    precision mediump sampler2D;\n\n    varying vec2 vUv;\n    uniform sampler2D uVelocity;\n    uniform sampler2D uSource;\n    uniform vec2 texelSize;\n    uniform float dt;\n    uniform float dissipation;\n\n    void main () {\n        vec2 coord = vUv - dt * texture2D(uVelocity, vUv).xy * texelSize;\n        gl_FragColor = dissipation * texture2D(uSource, coord);\n        gl_FragColor.a = 1.0;\n    }\n");
 
@@ -367,32 +370,15 @@ update();
 
 function update () {
     resizeCanvas();
+    input();
     step(0.016);
     render();
     requestAnimationFrame(update);
 }
 
-function step (dt) {
+function input () {
     if (splatStack.length > 0)
         { multipleSplats(splatStack.pop()); }
-
-    gl.viewport(0, 0, simWidth, simHeight);
-
-    advectionProgram.bind();
-    gl.uniform2f(advectionProgram.uniforms.texelSize, 1.0 / simWidth, 1.0 / simHeight);
-    gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.read.texId);
-    gl.uniform1i(advectionProgram.uniforms.uSource, velocity.read.texId);
-    gl.uniform1f(advectionProgram.uniforms.dt, dt);
-    gl.uniform1f(advectionProgram.uniforms.dissipation, config.VELOCITY_DISSIPATION);
-    blit(velocity.write.fbo);
-    velocity.swap();
-
-    gl.viewport(0, 0, dyeWidth, dyeHeight);
-    gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.read.texId);
-    gl.uniform1i(advectionProgram.uniforms.uSource, density.read.texId);
-    gl.uniform1f(advectionProgram.uniforms.dissipation, config.DENSITY_DISSIPATION);
-    blit(density.write.fbo);
-    density.swap();
 
     for (var i = 0; i < pointers.length; i++) {
         var pointer = pointers[i];
@@ -401,7 +387,9 @@ function step (dt) {
             pointer.moved = false;
         }
     }
+}
 
+function step (dt) {
     gl.viewport(0, 0, simWidth, simHeight);
 
     curlProgram.bind();
@@ -438,7 +426,7 @@ function step (dt) {
     pressureTexId = pressure.read.texId;
     gl.uniform1i(pressureProgram.uniforms.uPressure, pressureTexId);
     gl.activeTexture(gl.TEXTURE0 + pressureTexId);
-    for (var i$1 = 0; i$1 < config.PRESSURE_ITERATIONS; i$1++) {
+    for (var i = 0; i < config.PRESSURE_ITERATIONS; i++) {
         gl.bindTexture(gl.TEXTURE_2D, pressure.read.texture);
         blit(pressure.write.fbo);
         pressure.swap();
@@ -450,6 +438,26 @@ function step (dt) {
     gl.uniform1i(gradienSubtractProgram.uniforms.uVelocity, velocity.read.texId);
     blit(velocity.write.fbo);
     velocity.swap();
+
+    advectionProgram.bind();
+    gl.uniform2f(advectionProgram.uniforms.texelSize, 1.0 / simWidth, 1.0 / simHeight);
+    if (!ext.supportLinearFiltering)
+        { gl.uniform2f(advectionProgram.uniforms.dyeTexelSize, 1.0 / simWidth, 1.0 / simHeight); }
+    gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.read.texId);
+    gl.uniform1i(advectionProgram.uniforms.uSource, velocity.read.texId);
+    gl.uniform1f(advectionProgram.uniforms.dt, dt);
+    gl.uniform1f(advectionProgram.uniforms.dissipation, config.VELOCITY_DISSIPATION);
+    blit(velocity.write.fbo);
+    velocity.swap();
+
+    gl.viewport(0, 0, dyeWidth, dyeHeight);
+    if (!ext.supportLinearFiltering)
+        { gl.uniform2f(advectionProgram.uniforms.dyeTexelSize, 1.0 / dyeWidth, 1.0 / dyeWidth); }
+    gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.read.texId);
+    gl.uniform1i(advectionProgram.uniforms.uSource, density.read.texId);
+    gl.uniform1f(advectionProgram.uniforms.dissipation, config.DENSITY_DISSIPATION);
+    blit(density.write.fbo);
+    density.swap();
 }
 
 function render () {
