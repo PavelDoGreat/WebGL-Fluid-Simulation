@@ -16,13 +16,16 @@ let config = {
     SHADING: true
 }
 
-if (isMobile())
-    config.DYE_RESOLUTION = 256;
-
 let pointers = [];
 let splatStack = [];
 
 const { gl, ext } = getWebGLContext(canvas);
+
+if (isMobile())
+    config.DYE_RESOLUTION = 256;
+if (!ext.supportLinearFiltering)
+    config.SHADING = false;
+
 startGUI();
 
 function getWebGLContext (canvas) {
@@ -329,25 +332,27 @@ const advectionManualFilteringShader = compileShader(gl.FRAGMENT_SHADER, `
     uniform sampler2D uVelocity;
     uniform sampler2D uSource;
     uniform vec2 texelSize;
+    uniform vec2 dyeTexelSize;
     uniform float dt;
     uniform float dissipation;
 
-    vec4 bilerp (in sampler2D sam, in vec2 p) {
-        vec4 st;
-        st.xy = floor(p - 0.5) + 0.5;
-        st.zw = st.xy + 1.0;
-        vec4 uv = st * texelSize.xyxy;
-        vec4 a = texture2D(sam, uv.xy);
-        vec4 b = texture2D(sam, uv.zy);
-        vec4 c = texture2D(sam, uv.xw);
-        vec4 d = texture2D(sam, uv.zw);
-        vec2 f = p - st.xy;
-        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+    vec4 bilerp (in sampler2D sam, in vec2 uv, in vec2 tsize) {
+        vec2 st = uv / tsize - 0.5;
+
+        vec2 iuv = floor(st);
+        vec2 fuv = fract(st);
+
+        vec4 a = texture2D(sam, (iuv + vec2(0.5, 0.5)) * tsize);
+        vec4 b = texture2D(sam, (iuv + vec2(1.5, 0.5)) * tsize);
+        vec4 c = texture2D(sam, (iuv + vec2(0.5, 1.5)) * tsize);
+        vec4 d = texture2D(sam, (iuv + vec2(1.5, 1.5)) * tsize);
+
+        return mix(mix(a, b, fuv.x), mix(c, d, fuv.x), fuv.y);
     }
 
     void main () {
-        vec2 coord = gl_FragCoord.xy - dt * bilerp(uVelocity, vUv).xy;
-        gl_FragColor = dissipation * bilerp(uSource, coord);
+        vec2 coord = vUv - dt * bilerp(uVelocity, vUv, texelSize).xy * texelSize;
+        gl_FragColor = dissipation * bilerp(uSource, coord, dyeTexelSize);
         gl_FragColor.a = 1.0;
     }
 `);
@@ -628,32 +633,15 @@ update();
 
 function update () {
     resizeCanvas();
+    input();
     step(0.016);
     render();
     requestAnimationFrame(update);
 }
 
-function step (dt) {
+function input () {
     if (splatStack.length > 0)
         multipleSplats(splatStack.pop());
-
-    gl.viewport(0, 0, simWidth, simHeight);
-
-    advectionProgram.bind();
-    gl.uniform2f(advectionProgram.uniforms.texelSize, 1.0 / simWidth, 1.0 / simHeight);
-    gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.read.texId);
-    gl.uniform1i(advectionProgram.uniforms.uSource, velocity.read.texId);
-    gl.uniform1f(advectionProgram.uniforms.dt, dt);
-    gl.uniform1f(advectionProgram.uniforms.dissipation, config.VELOCITY_DISSIPATION);
-    blit(velocity.write.fbo);
-    velocity.swap();
-
-    gl.viewport(0, 0, dyeWidth, dyeHeight);
-    gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.read.texId);
-    gl.uniform1i(advectionProgram.uniforms.uSource, density.read.texId);
-    gl.uniform1f(advectionProgram.uniforms.dissipation, config.DENSITY_DISSIPATION);
-    blit(density.write.fbo);
-    density.swap();
 
     for (let i = 0; i < pointers.length; i++) {
         const pointer = pointers[i];
@@ -662,7 +650,9 @@ function step (dt) {
             pointer.moved = false;
         }
     }
+}
 
+function step (dt) {
     gl.viewport(0, 0, simWidth, simHeight);
 
     curlProgram.bind();
@@ -711,6 +701,26 @@ function step (dt) {
     gl.uniform1i(gradienSubtractProgram.uniforms.uVelocity, velocity.read.texId);
     blit(velocity.write.fbo);
     velocity.swap();
+
+    advectionProgram.bind();
+    gl.uniform2f(advectionProgram.uniforms.texelSize, 1.0 / simWidth, 1.0 / simHeight);
+    if (!ext.supportLinearFiltering)
+        gl.uniform2f(advectionProgram.uniforms.dyeTexelSize, 1.0 / simWidth, 1.0 / simHeight);
+    gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.read.texId);
+    gl.uniform1i(advectionProgram.uniforms.uSource, velocity.read.texId);
+    gl.uniform1f(advectionProgram.uniforms.dt, dt);
+    gl.uniform1f(advectionProgram.uniforms.dissipation, config.VELOCITY_DISSIPATION);
+    blit(velocity.write.fbo);
+    velocity.swap();
+
+    gl.viewport(0, 0, dyeWidth, dyeHeight);
+    if (!ext.supportLinearFiltering)
+        gl.uniform2f(advectionProgram.uniforms.dyeTexelSize, 1.0 / dyeWidth, 1.0 / dyeWidth);
+    gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.read.texId);
+    gl.uniform1i(advectionProgram.uniforms.uSource, density.read.texId);
+    gl.uniform1f(advectionProgram.uniforms.dissipation, config.DENSITY_DISSIPATION);
+    blit(density.write.fbo);
+    density.swap();
 }
 
 function render () {
