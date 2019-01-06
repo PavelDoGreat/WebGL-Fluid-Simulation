@@ -20,7 +20,6 @@ var config = {
     TRANSPARENT: false
 }
 
-<<<<<<< HEAD
 function pointerPrototype () {
     this.id = -1;
     this.x = 0;
@@ -32,8 +31,6 @@ function pointerPrototype () {
     this.color = [30, 0, 300];
 }
 
-=======
->>>>>>> 55000316cd78f2265594266de0b1ce450d88bc09
 var pointers = [];
 var splatStack = [];
 pointers.push(new pointerPrototype());
@@ -42,15 +39,10 @@ var ref = getWebGLContext(canvas);
 var gl = ref.gl;
 var ext = ref.ext;
 
-<<<<<<< HEAD
 if (isMobile()) {
     config.DYE_RESOLUTION = 256;
     config.SHADING = false;
 }
-=======
-if (isMobile())
-    { config.DYE_RESOLUTION = 256; }
->>>>>>> 55000316cd78f2265594266de0b1ce450d88bc09
 if (!ext.supportLinearFiltering)
     { config.SHADING = false; }
 
@@ -315,11 +307,7 @@ var displayShadingShader = compileShader(gl.FRAGMENT_SHADER, "\n    precision hi
 
 var splatShader = compileShader(gl.FRAGMENT_SHADER, "\n    precision highp float;\n    precision highp sampler2D;\n\n    varying vec2 vUv;\n    uniform sampler2D uTarget;\n    uniform float aspectRatio;\n    uniform vec3 color;\n    uniform vec2 point;\n    uniform float radius;\n\n    void main () {\n        vec2 p = vUv - point.xy;\n        p.x *= aspectRatio;\n        vec3 splat = exp(-dot(p, p) / radius) * color;\n        vec3 base = texture2D(uTarget, vUv).xyz;\n        gl_FragColor = vec4(base + splat, 1.0);\n    }\n");
 
-<<<<<<< HEAD
 var advectionManualFilteringShader = compileShader(gl.FRAGMENT_SHADER, "\n    precision highp float;\n    precision highp sampler2D;\n\n    varying vec2 vUv;\n    uniform sampler2D uVelocity;\n    uniform sampler2D uSource;\n    uniform vec2 texelSize;\n    uniform vec2 dyeTexelSize;\n    uniform float dt;\n    uniform float dissipation;\n\n    vec4 bilerp (sampler2D sam, vec2 uv, vec2 tsize) {\n        vec2 st = uv / tsize - 0.5;\n\n        vec2 iuv = floor(st);\n        vec2 fuv = fract(st);\n\n        vec4 a = texture2D(sam, (iuv + vec2(0.5, 0.5)) * tsize);\n        vec4 b = texture2D(sam, (iuv + vec2(1.5, 0.5)) * tsize);\n        vec4 c = texture2D(sam, (iuv + vec2(0.5, 1.5)) * tsize);\n        vec4 d = texture2D(sam, (iuv + vec2(1.5, 1.5)) * tsize);\n\n        return mix(mix(a, b, fuv.x), mix(c, d, fuv.x), fuv.y);\n    }\n\n    void main () {\n        vec2 coord = vUv - dt * bilerp(uVelocity, vUv, texelSize).xy * texelSize;\n        gl_FragColor = dissipation * bilerp(uSource, coord, dyeTexelSize);\n        gl_FragColor.a = 1.0;\n    }\n");
-=======
-var advectionManualFilteringShader = compileShader(gl.FRAGMENT_SHADER, "\n    precision highp float;\n    precision mediump sampler2D;\n\n    varying vec2 vUv;\n    uniform sampler2D uVelocity;\n    uniform sampler2D uSource;\n    uniform vec2 texelSize;\n    uniform vec2 dyeTexelSize;\n    uniform float dt;\n    uniform float dissipation;\n\n    vec4 bilerp (in sampler2D sam, in vec2 uv, in vec2 tsize) {\n        vec2 st = uv / tsize - 0.5;\n\n        vec2 iuv = floor(st);\n        vec2 fuv = fract(st);\n\n        vec4 a = texture2D(sam, (iuv + vec2(0.5, 0.5)) * tsize);\n        vec4 b = texture2D(sam, (iuv + vec2(1.5, 0.5)) * tsize);\n        vec4 c = texture2D(sam, (iuv + vec2(0.5, 1.5)) * tsize);\n        vec4 d = texture2D(sam, (iuv + vec2(1.5, 1.5)) * tsize);\n\n        return mix(mix(a, b, fuv.x), mix(c, d, fuv.x), fuv.y);\n    }\n\n    void main () {\n        vec2 coord = vUv - dt * bilerp(uVelocity, vUv, texelSize).xy * texelSize;\n        gl_FragColor = dissipation * bilerp(uSource, coord, dyeTexelSize);\n        gl_FragColor.a = 1.0;\n    }\n");
->>>>>>> 55000316cd78f2265594266de0b1ce450d88bc09
 
 var advectionShader = compileShader(gl.FRAGMENT_SHADER, "\n    precision highp float;\n    precision highp sampler2D;\n\n    varying vec2 vUv;\n    uniform sampler2D uVelocity;\n    uniform sampler2D uSource;\n    uniform vec2 texelSize;\n    uniform float dt;\n    uniform float dissipation;\n\n    void main () {\n        vec2 coord = vUv - dt * texture2D(uVelocity, vUv).xy * texelSize;\n        gl_FragColor = dissipation * texture2D(uSource, coord);\n        gl_FragColor.a = 1.0;\n    }\n");
 
@@ -457,14 +445,9 @@ update();
 function update () {
     resizeCanvas();
     input();
-<<<<<<< HEAD
     if (!config.PAUSED)
         { step(0.016); }
     render(null);
-=======
-    step(0.016);
-    render();
->>>>>>> 55000316cd78f2265594266de0b1ce450d88bc09
     requestAnimationFrame(update);
 }
 
@@ -473,7 +456,6 @@ function input () {
         { multipleSplats(splatStack.pop()); }
 
     for (var i = 0; i < pointers.length; i++) {
-<<<<<<< HEAD
         var p = pointers[i];
         if (p.moved) {
             splat(p.x, p.y, p.dx, p.dy, p.color);
@@ -490,21 +472,12 @@ function input () {
         for (var i$1 = 0; i$1 < pointers.length; i$1++) {
             var p$1 = pointers[i$1];
             p$1.color = generateColor();
-=======
-        var pointer = pointers[i];
-        if (pointer.moved) {
-            splat(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
-            pointer.moved = false;
->>>>>>> 55000316cd78f2265594266de0b1ce450d88bc09
         }
     }
 }
 
 function step (dt) {
-<<<<<<< HEAD
     gl.disable(gl.BLEND);
-=======
->>>>>>> 55000316cd78f2265594266de0b1ce450d88bc09
     gl.viewport(0, 0, simWidth, simHeight);
 
     curlProgram.bind();
@@ -566,14 +539,9 @@ function step (dt) {
     velocity.swap();
 
     gl.viewport(0, 0, dyeWidth, dyeHeight);
-<<<<<<< HEAD
 
     if (!ext.supportLinearFiltering)
         { gl.uniform2f(advectionProgram.uniforms.dyeTexelSize, 1.0 / dyeWidth, 1.0 / dyeHeight); }
-=======
-    if (!ext.supportLinearFiltering)
-        { gl.uniform2f(advectionProgram.uniforms.dyeTexelSize, 1.0 / dyeWidth, 1.0 / dyeWidth); }
->>>>>>> 55000316cd78f2265594266de0b1ce450d88bc09
     gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.read.texId);
     gl.uniform1i(advectionProgram.uniforms.uSource, density.read.texId);
     gl.uniform1f(advectionProgram.uniforms.dissipation, config.DENSITY_DISSIPATION);
