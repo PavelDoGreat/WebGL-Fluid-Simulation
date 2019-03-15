@@ -162,7 +162,7 @@ function startGUI () {
     let captureFolder = gui.addFolder('Capture');
     captureFolder.addColor(config, 'BACK_COLOR').name('background color');
     captureFolder.add(config, 'TRANSPARENT').name('transparent');
-    captureFolder.add({ fun: CaptureScreenshot }, 'fun').name('take screenshot');
+    captureFolder.add({ fun: captureScreenshot }, 'fun').name('take screenshot');
 
     let github = gui.add({ fun : () => {
         window.open('https://github.com/PavelDoGreat/WebGL-Fluid-Simulation');
@@ -198,7 +198,7 @@ function startGUI () {
         gui.close();
 }
 
-function CaptureScreenshot () {
+function captureScreenshot () {
     colorProgram.bind();
     gl.uniform4f(colorProgram.uniforms.color, 0, 0, 0, 1);
     blit(density.write.fbo);
