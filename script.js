@@ -37,10 +37,8 @@ pointers.push(new pointerPrototype());
 
 const { gl, ext } = getWebGLContext(canvas);
 
-if (isMobile()) {
-    config.DYE_RESOLUTION = 256;
+if (isMobile())
     config.SHADING = false;
-}
 if (!ext.supportLinearFiltering)
     config.SHADING = false;
 
@@ -183,6 +181,16 @@ function startGUI () {
     let twitterIcon = document.createElement('span');
     twitter.domElement.parentElement.appendChild(twitterIcon);
     twitterIcon.className = 'icon twitter';
+
+    let discord = gui.add({ fun : () => {
+        window.open('https://discordapp.com/invite/CeqZDDE');
+        ga('send', 'event', 'link button', 'discord');
+    } }, 'fun').name('Discord');
+    discord.__li.className = 'cr function bigFont';
+    discord.__li.style.borderLeft = '3px solid #8C8C8C';
+    let discordIcon = document.createElement('span');
+    discord.domElement.parentElement.appendChild(discordIcon);
+    discordIcon.className = 'icon discord';
 
     let app = gui.add({ fun : () => {
         window.open('http://onelink.to/5b58bn');
@@ -975,6 +983,8 @@ window.addEventListener('touchend', e => {
 window.addEventListener('keydown', e => {
     if (e.key === 'p')
         config.PAUSED = !config.PAUSED;
+    if (e.key === ' ')
+        splatStack.push(parseInt(Math.random() * 20) + 5);
 });
 
 function generateColor () {
