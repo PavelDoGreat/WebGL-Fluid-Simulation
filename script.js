@@ -39,10 +39,8 @@ var ref = getWebGLContext(canvas);
 var gl = ref.gl;
 var ext = ref.ext;
 
-if (isMobile()) {
-    config.DYE_RESOLUTION = 256;
-    config.SHADING = false;
-}
+if (isMobile())
+    { config.SHADING = false; }
 if (!ext.supportLinearFiltering)
     { config.SHADING = false; }
 
@@ -164,7 +162,7 @@ function startGUI () {
     var captureFolder = gui.addFolder('Capture');
     captureFolder.addColor(config, 'BACK_COLOR').name('background color');
     captureFolder.add(config, 'TRANSPARENT').name('transparent');
-    captureFolder.add({ fun: CaptureScreenshot }, 'fun').name('take screenshot');
+    captureFolder.add({ fun: captureScreenshot }, 'fun').name('take screenshot');
 
     var github = gui.add({ fun : function () {
         window.open('https://github.com/PavelDoGreat/WebGL-Fluid-Simulation');
@@ -186,6 +184,16 @@ function startGUI () {
     twitter.domElement.parentElement.appendChild(twitterIcon);
     twitterIcon.className = 'icon twitter';
 
+    var discord = gui.add({ fun : function () {
+        window.open('https://discordapp.com/invite/CeqZDDE');
+        ga('send', 'event', 'link button', 'discord');
+    } }, 'fun').name('Discord');
+    discord.__li.className = 'cr function bigFont';
+    discord.__li.style.borderLeft = '3px solid #8C8C8C';
+    var discordIcon = document.createElement('span');
+    discord.domElement.parentElement.appendChild(discordIcon);
+    discordIcon.className = 'icon discord';
+
     var app = gui.add({ fun : function () {
         window.open('http://onelink.to/5b58bn');
         ga('send', 'event', 'link button', 'app');
@@ -200,7 +208,7 @@ function startGUI () {
         { gui.close(); }
 }
 
-function CaptureScreenshot () {
+function captureScreenshot () {
     colorProgram.bind();
     gl.uniform4f(colorProgram.uniforms.color, 0, 0, 0, 1);
     blit(density.write.fbo);
@@ -685,6 +693,8 @@ window.addEventListener('touchend', function (e) {
 window.addEventListener('keydown', function (e) {
     if (e.key === 'p')
         { config.PAUSED = !config.PAUSED; }
+    if (e.key === ' ')
+        { splatStack.push(parseInt(Math.random() * 20) + 5); }
 });
 
 function generateColor () {
