@@ -404,7 +404,7 @@ const displayBloomShader = compileShader(gl.FRAGMENT_SHADER, `
         vec3 bloom = texture2D(uBloom, vUv).rgb;
         vec3 noise = texture2D(uDithering, vUv * ditherScale).rgb;
         noise = noise * 2.0 - 1.0;
-        bloom += noise / 255.0;
+        bloom += noise / 800.0;
         bloom = pow(bloom.rgb, vec3(1.0 / 2.2));
         C += bloom;
         float a = max(C.r, max(C.g, C.b));
@@ -479,7 +479,7 @@ const displayBloomShadingShader = compileShader(gl.FRAGMENT_SHADER, `
         vec3 bloom = texture2D(uBloom, vUv).rgb;
         vec3 noise = texture2D(uDithering, vUv * ditherScale).rgb;
         noise = noise * 2.0 - 1.0;
-        bloom += noise / 255.0;
+        bloom += noise / 800.0;
         bloom = pow(bloom.rgb, vec3(1.0 / 2.2));
         C += bloom;
 
