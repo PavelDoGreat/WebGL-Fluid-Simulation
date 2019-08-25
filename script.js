@@ -31,8 +31,8 @@ var config = {
     SIM_RESOLUTION: 128,
     DYE_RESOLUTION: 1024,
     CAPTURE_RESOLUTION: 512,
-    DENSITY_DISSIPATION: 2,
-    VELOCITY_DISSIPATION: 2,
+    DENSITY_DISSIPATION: 1,
+    VELOCITY_DISSIPATION: 0.2,
     PRESSURE: 0.8,
     PRESSURE_ITERATIONS: 20,
     CURL: 30,
@@ -52,7 +52,7 @@ var config = {
     BLOOM_SOFT_KNEE: 0.7,
     SUNRAYS: true,
     SUNRAYS_RESOLUTION: 196,
-    SUNRAYS_WEIGHT: 0.3,
+    SUNRAYS_WEIGHT: 1.0,
 }
 
 function pointerPrototype () {
@@ -1010,7 +1010,10 @@ canvas.addEventListener('touchstart', function (e) {
         var touch = touches[i];
         var pointer = pointers.find(function (p) { return p.id == touch.identifier; });
         if (pointer == null)
-            { pointer = new pointerPrototype(); }
+        {
+            pointer = new pointerPrototype();
+            pointers.push(pointer);
+        }
         var posX = scaleByPixelRatio(touch.pageX);
         var posY = scaleByPixelRatio(touch.pageY);
         updatePointerDownData(pointer, touch.identifier, posX, posY);
