@@ -31,8 +31,8 @@ let config = {
     SIM_RESOLUTION: 128,
     DYE_RESOLUTION: 1024,
     CAPTURE_RESOLUTION: 512,
-    DENSITY_DISSIPATION: 2,
-    VELOCITY_DISSIPATION: 2,
+    DENSITY_DISSIPATION: 1,
+    VELOCITY_DISSIPATION: 0.2,
     PRESSURE: 0.8,
     PRESSURE_ITERATIONS: 20,
     CURL: 30,
@@ -52,7 +52,7 @@ let config = {
     BLOOM_SOFT_KNEE: 0.7,
     SUNRAYS: true,
     SUNRAYS_RESOLUTION: 196,
-    SUNRAYS_WEIGHT: 0.3,
+    SUNRAYS_WEIGHT: 1.0,
 }
 
 function pointerPrototype () {
@@ -1443,7 +1443,10 @@ canvas.addEventListener('touchstart', e => {
         let touch = touches[i];
         let pointer = pointers.find(p => p.id == touch.identifier);
         if (pointer == null)
+        {
             pointer = new pointerPrototype();
+            pointers.push(pointer);
+        }
         let posX = scaleByPixelRatio(touch.pageX);
         let posY = scaleByPixelRatio(touch.pageY);
         updatePointerDownData(pointer, touch.identifier, posX, posY);
