@@ -1006,20 +1006,13 @@ window.addEventListener('mouseup', function () {
 canvas.addEventListener('touchstart', function (e) {
     e.preventDefault();
     var touches = e.targetTouches;
-    var loop = function ( i ) {
-        var touch = touches[i];
-        var pointer = pointers.find(function (p) { return p.id == touch.identifier; });
-        if (pointer == null)
-        {
-            pointer = new pointerPrototype();
-            pointers.push(pointer);
-        }
-        var posX = scaleByPixelRatio(touch.pageX);
-        var posY = scaleByPixelRatio(touch.pageY);
-        updatePointerDownData(pointer, touch.identifier, posX, posY);
-    };
-
-    for (var i = 0; i < touches.length; i++) loop( i );
+    for (var i = 0; i < touches.length; i++) {
+        if (i >= pointers.length)
+            { pointers.push(new pointerPrototype()); }
+        var posX = scaleByPixelRatio(touches[i].pageX);
+        var posY = scaleByPixelRatio(touches[i].pageY);
+        updatePointerDownData(pointers[i], touches[i].identifier, posX, posY);
+    }
 });
 
 canvas.addEventListener('touchmove', function (e) {
