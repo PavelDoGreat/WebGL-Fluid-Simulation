@@ -1423,6 +1423,8 @@ canvas.addEventListener('mousedown', e => {
     let posX = scaleByPixelRatio(e.offsetX);
     let posY = scaleByPixelRatio(e.offsetY);
     let pointer = pointers.find(p => p.id == -1);
+    if (pointer == null)
+        pointer = new pointerPrototype();
     updatePointerDownData(pointer, -1, posX, posY);
 });
 
@@ -1433,18 +1435,18 @@ canvas.addEventListener('mousemove', e => {
 });
 
 window.addEventListener('mouseup', () => {
-    updatePoinerUpData(pointers[0]);
+    updatePointerUpData(pointers[0]);
 });
 
 canvas.addEventListener('touchstart', e => {
     e.preventDefault();
     const touches = e.targetTouches;
+    while (touches.length >= pointers.length)
+        pointers.push(new pointerPrototype());
     for (let i = 0; i < touches.length; i++) {
-        if (i >= pointers.length)
-            pointers.push(new pointerPrototype());
         let posX = scaleByPixelRatio(touches[i].pageX);
         let posY = scaleByPixelRatio(touches[i].pageY);
-        updatePointerDownData(pointers[i], touches[i].identifier, posX, posY);
+        updatePointerDownData(pointers[i + 1], touches[i].identifier, posX, posY);
     }
 });
 
@@ -1454,16 +1456,17 @@ canvas.addEventListener('touchmove', e => {
     for (let i = 0; i < touches.length; i++) {
         let posX = scaleByPixelRatio(touches[i].pageX);
         let posY = scaleByPixelRatio(touches[i].pageY);
-        updatePointerMoveData(pointers[i], posX, posY);
+        updatePointerMoveData(pointers[i + 1], posX, posY);
     }
 }, false);
 
 window.addEventListener('touchend', e => {
     const touches = e.changedTouches;
     for (let i = 0; i < touches.length; i++)
-        for (let j = 0; j < pointers.length; j++)
-            if (touches[i].identifier == pointers[j].id)
-                updatePoinerUpData(pointers[j]);
+    {
+        let pointer = pointers.find(p => p.id == touches[i].identifier);
+        updatePointerUpData(pointer);
+    }
 });
 
 window.addEventListener('keydown', e => {
@@ -1496,7 +1499,7 @@ function updatePointerMoveData (pointer, posX, posY) {
     pointer.deltaY = correctDeltaY(pointer.texcoordY - pointer.prevTexcoordY);
 }
 
-function updatePoinerUpData (pointer) {
+function updatePointerUpData (pointer) {
     pointer.down = false;
 }
 
