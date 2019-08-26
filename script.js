@@ -1440,16 +1440,11 @@ canvas.addEventListener('touchstart', e => {
     e.preventDefault();
     const touches = e.targetTouches;
     for (let i = 0; i < touches.length; i++) {
-        let touch = touches[i];
-        let pointer = pointers.find(p => p.id == touch.identifier);
-        if (pointer == null)
-        {
-            pointer = new pointerPrototype();
-            pointers.push(pointer);
-        }
-        let posX = scaleByPixelRatio(touch.pageX);
-        let posY = scaleByPixelRatio(touch.pageY);
-        updatePointerDownData(pointer, touch.identifier, posX, posY);
+        if (i >= pointers.length)
+            pointers.push(new pointerPrototype());
+        let posX = scaleByPixelRatio(touches[i].pageX);
+        let posY = scaleByPixelRatio(touches[i].pageY);
+        updatePointerDownData(pointers[i], touches[i].identifier, posX, posY);
     }
 });
 
