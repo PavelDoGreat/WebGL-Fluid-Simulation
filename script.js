@@ -990,6 +990,8 @@ canvas.addEventListener('mousedown', function (e) {
     var posX = scaleByPixelRatio(e.offsetX);
     var posY = scaleByPixelRatio(e.offsetY);
     var pointer = pointers.find(function (p) { return p.id == -1; });
+    if (pointer == null)
+        { pointer = new pointerPrototype(); }
     updatePointerDownData(pointer, -1, posX, posY);
 });
 
@@ -1000,18 +1002,18 @@ canvas.addEventListener('mousemove', function (e) {
 });
 
 window.addEventListener('mouseup', function () {
-    updatePoinerUpData(pointers[0]);
+    updatePointerUpData(pointers[0]);
 });
 
 canvas.addEventListener('touchstart', function (e) {
     e.preventDefault();
     var touches = e.targetTouches;
+    while (touches.length >= pointers.length)
+        { pointers.push(new pointerPrototype()); }
     for (var i = 0; i < touches.length; i++) {
-        if (i >= pointers.length)
-            { pointers.push(new pointerPrototype()); }
         var posX = scaleByPixelRatio(touches[i].pageX);
         var posY = scaleByPixelRatio(touches[i].pageY);
-        updatePointerDownData(pointers[i], touches[i].identifier, posX, posY);
+        updatePointerDownData(pointers[i + 1], touches[i].identifier, posX, posY);
     }
 });
 
@@ -1021,16 +1023,19 @@ canvas.addEventListener('touchmove', function (e) {
     for (var i = 0; i < touches.length; i++) {
         var posX = scaleByPixelRatio(touches[i].pageX);
         var posY = scaleByPixelRatio(touches[i].pageY);
-        updatePointerMoveData(pointers[i], posX, posY);
+        updatePointerMoveData(pointers[i + 1], posX, posY);
     }
 }, false);
 
 window.addEventListener('touchend', function (e) {
     var touches = e.changedTouches;
+    var loop = function ( i ) {
+        var pointer = pointers.find(function (p) { return p.id == touches[i].identifier; });
+        updatePointerUpData(pointer);
+    };
+
     for (var i = 0; i < touches.length; i++)
-        { for (var j = 0; j < pointers.length; j++)
-            { if (touches[i].identifier == pointers[j].id)
-                { updatePoinerUpData(pointers[j]); } } }
+    loop( i );
 });
 
 window.addEventListener('keydown', function (e) {
@@ -1063,7 +1068,7 @@ function updatePointerMoveData (pointer, posX, posY) {
     pointer.deltaY = correctDeltaY(pointer.texcoordY - pointer.prevTexcoordY);
 }
 
-function updatePoinerUpData (pointer) {
+function updatePointerUpData (pointer) {
     pointer.down = false;
 }
 
