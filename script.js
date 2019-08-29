@@ -1124,7 +1124,7 @@ initFramebuffers();
 multipleSplats(parseInt(Math.random() * 20) + 5);
 
 var autosplat = function() {
-    if(config.AUTOSPLAT_ENABLED) {
+    if(config.AUTOSPLAT_ENABLED && !config.PAUSED) {
         splatStack.push(config.AUTOSPLAT_COUNT);
     }
 
