@@ -70,7 +70,6 @@ function pointerPrototype () {
 
 let pointers = [];
 let splatStack = [];
-let bloomFramebuffers = [];
 pointers.push(new pointerPrototype());
 
 const { gl, ext } = getWebGLContext(canvas);
@@ -902,6 +901,7 @@ let divergence;
 let curl;
 let pressure;
 let bloom;
+let bloomFramebuffers = [];
 let sunrays;
 let sunraysTemp;
 
@@ -1429,9 +1429,11 @@ canvas.addEventListener('mousedown', e => {
 });
 
 canvas.addEventListener('mousemove', e => {
+    let pointer = pointers[0];
+    if (!pointer.down) return;
     let posX = scaleByPixelRatio(e.offsetX);
     let posY = scaleByPixelRatio(e.offsetY);
-    updatePointerMoveData(pointers[0], posX, posY);
+    updatePointerMoveData(pointer, posX, posY);
 });
 
 window.addEventListener('mouseup', () => {
@@ -1444,9 +1446,11 @@ canvas.addEventListener('touchstart', e => {
     while (touches.length >= pointers.length)
         pointers.push(new pointerPrototype());
     for (let i = 0; i < touches.length; i++) {
+        let pointer = pointers[i + 1];
+        if (pointer.down) continue;
         let posX = scaleByPixelRatio(touches[i].pageX);
         let posY = scaleByPixelRatio(touches[i].pageY);
-        updatePointerDownData(pointers[i + 1], touches[i].identifier, posX, posY);
+        updatePointerDownData(pointer, touches[i].identifier, posX, posY);
     }
 });
 
@@ -1454,9 +1458,11 @@ canvas.addEventListener('touchmove', e => {
     e.preventDefault();
     const touches = e.targetTouches;
     for (let i = 0; i < touches.length; i++) {
+        let pointer = pointers[i + 1];
+        if (!pointer.down) continue;
         let posX = scaleByPixelRatio(touches[i].pageX);
         let posY = scaleByPixelRatio(touches[i].pageY);
-        updatePointerMoveData(pointers[i + 1], posX, posY);
+        updatePointerMoveData(pointer, posX, posY);
     }
 }, false);
 
@@ -1465,6 +1471,7 @@ window.addEventListener('touchend', e => {
     for (let i = 0; i < touches.length; i++)
     {
         let pointer = pointers.find(p => p.id == touches[i].identifier);
+        if (pointer == null) continue;
         updatePointerUpData(pointer);
     }
 });
@@ -1490,13 +1497,13 @@ function updatePointerDownData (pointer, id, posX, posY) {
 }
 
 function updatePointerMoveData (pointer, posX, posY) {
-    pointer.moved = pointer.down;
     pointer.prevTexcoordX = pointer.texcoordX;
     pointer.prevTexcoordY = pointer.texcoordY;
     pointer.texcoordX = posX / canvas.width;
     pointer.texcoordY = 1.0 - posY / canvas.height;
     pointer.deltaX = correctDeltaX(pointer.texcoordX - pointer.prevTexcoordX);
     pointer.deltaY = correctDeltaY(pointer.texcoordY - pointer.prevTexcoordY);
+    pointer.moved = Math.abs(pointer.deltaX) > 0 || Math.abs(pointer.deltaY) > 0;
 }
 
 function updatePointerUpData (pointer) {
