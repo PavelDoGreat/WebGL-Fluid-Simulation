@@ -70,7 +70,6 @@ function pointerPrototype () {
 
 var pointers = [];
 var splatStack = [];
-var bloomFramebuffers = [];
 pointers.push(new pointerPrototype());
 
 var ref = getWebGLContext(canvas);
@@ -469,6 +468,7 @@ var divergence;
 var curl;
 var pressure;
 var bloom;
+var bloomFramebuffers = [];
 var sunrays;
 var sunraysTemp;
 
@@ -996,9 +996,11 @@ canvas.addEventListener('mousedown', function (e) {
 });
 
 canvas.addEventListener('mousemove', function (e) {
+    var pointer = pointers[0];
+    if (!pointer.down) { return; }
     var posX = scaleByPixelRatio(e.offsetX);
     var posY = scaleByPixelRatio(e.offsetY);
-    updatePointerMoveData(pointers[0], posX, posY);
+    updatePointerMoveData(pointer, posX, posY);
 });
 
 window.addEventListener('mouseup', function () {
@@ -1011,9 +1013,11 @@ canvas.addEventListener('touchstart', function (e) {
     while (touches.length >= pointers.length)
         { pointers.push(new pointerPrototype()); }
     for (var i = 0; i < touches.length; i++) {
+        var pointer = pointers[i + 1];
+        if (pointer.down) { continue; }
         var posX = scaleByPixelRatio(touches[i].pageX);
         var posY = scaleByPixelRatio(touches[i].pageY);
-        updatePointerDownData(pointers[i + 1], touches[i].identifier, posX, posY);
+        updatePointerDownData(pointer, touches[i].identifier, posX, posY);
     }
 });
 
@@ -1021,9 +1025,11 @@ canvas.addEventListener('touchmove', function (e) {
     e.preventDefault();
     var touches = e.targetTouches;
     for (var i = 0; i < touches.length; i++) {
+        var pointer = pointers[i + 1];
+        if (!pointer.down) { continue; }
         var posX = scaleByPixelRatio(touches[i].pageX);
         var posY = scaleByPixelRatio(touches[i].pageY);
-        updatePointerMoveData(pointers[i + 1], posX, posY);
+        updatePointerMoveData(pointer, posX, posY);
     }
 }, false);
 
@@ -1031,6 +1037,7 @@ window.addEventListener('touchend', function (e) {
     var touches = e.changedTouches;
     var loop = function ( i ) {
         var pointer = pointers.find(function (p) { return p.id == touches[i].identifier; });
+        if (pointer == null) { return; }
         updatePointerUpData(pointer);
     };
 
@@ -1059,13 +1066,13 @@ function updatePointerDownData (pointer, id, posX, posY) {
 }
 
 function updatePointerMoveData (pointer, posX, posY) {
-    pointer.moved = pointer.down;
     pointer.prevTexcoordX = pointer.texcoordX;
     pointer.prevTexcoordY = pointer.texcoordY;
     pointer.texcoordX = posX / canvas.width;
     pointer.texcoordY = 1.0 - posY / canvas.height;
     pointer.deltaX = correctDeltaX(pointer.texcoordX - pointer.prevTexcoordX);
     pointer.deltaY = correctDeltaY(pointer.texcoordY - pointer.prevTexcoordY);
+    pointer.moved = Math.abs(pointer.deltaX) > 0 || Math.abs(pointer.deltaY) > 0;
 }
 
 function updatePointerUpData (pointer) {
