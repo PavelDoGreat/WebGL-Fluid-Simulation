@@ -1446,11 +1446,9 @@ canvas.addEventListener('touchstart', e => {
     while (touches.length >= pointers.length)
         pointers.push(new pointerPrototype());
     for (let i = 0; i < touches.length; i++) {
-        let pointer = pointers[i + 1];
-        if (pointer.down) continue;
         let posX = scaleByPixelRatio(touches[i].pageX);
         let posY = scaleByPixelRatio(touches[i].pageY);
-        updatePointerDownData(pointer, touches[i].identifier, posX, posY);
+        updatePointerDownData(pointers[i + 1], touches[i].identifier, posX, posY);
     }
 });
 
