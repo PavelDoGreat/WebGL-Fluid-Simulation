@@ -14,4 +14,4 @@ https://github.com/haxiomic/GPU-Fluid-Experiments
 
 ## License
 
-The code is available under the [MIT license](https://github.com/PavelDoGreat/WebGL-Fluid-Simulation/blob/master/LICENSE)
+The code is available under the [MIT license](LICENSE)
