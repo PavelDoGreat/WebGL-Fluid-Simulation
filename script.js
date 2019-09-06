@@ -41,6 +41,7 @@ let config = {
     SHADING: true,
     COLORFUL: true,
     COLOR_UPDATE_SPEED: 10,
+    CONTINUOUS: false,
     PAUSED: false,
     BACK_COLOR: { r: 0, g: 0, b: 0 },
     TRANSPARENT: false,
@@ -70,6 +71,7 @@ function pointerPrototype () {
 
 let pointers = [];
 let splatStack = [];
+let bloomFramebuffers = [];
 pointers.push(new pointerPrototype());
 
 const { gl, ext } = getWebGLContext(canvas);
@@ -187,6 +189,7 @@ function startGUI () {
     gui.add(config, 'SPLAT_RADIUS', 0.01, 1.0).name('splat radius');
     gui.add(config, 'SHADING').name('shading').onFinishChange(updateKeywords);
     gui.add(config, 'COLORFUL').name('colorful');
+    gui.add(config, 'CONTINUOUS').name('continuous').listen();
     gui.add(config, 'PAUSED').name('paused').listen();
 
     gui.add({ fun: () => {
@@ -901,7 +904,6 @@ let divergence;
 let curl;
 let pressure;
 let bloom;
-let bloomFramebuffers = [];
 let sunrays;
 let sunraysTemp;
 
@@ -1429,11 +1431,9 @@ canvas.addEventListener('mousedown', e => {
 });
 
 canvas.addEventListener('mousemove', e => {
-    let pointer = pointers[0];
-    if (!pointer.down) return;
     let posX = scaleByPixelRatio(e.offsetX);
     let posY = scaleByPixelRatio(e.offsetY);
-    updatePointerMoveData(pointer, posX, posY);
+    updatePointerMoveData(pointers[0], posX, posY);
 });
 
 window.addEventListener('mouseup', () => {
@@ -1456,11 +1456,9 @@ canvas.addEventListener('touchmove', e => {
     e.preventDefault();
     const touches = e.targetTouches;
     for (let i = 0; i < touches.length; i++) {
-        let pointer = pointers[i + 1];
-        if (!pointer.down) continue;
         let posX = scaleByPixelRatio(touches[i].pageX);
         let posY = scaleByPixelRatio(touches[i].pageY);
-        updatePointerMoveData(pointer, posX, posY);
+        updatePointerMoveData(pointers[i + 1], posX, posY);
     }
 }, false);
 
@@ -1469,7 +1467,6 @@ window.addEventListener('touchend', e => {
     for (let i = 0; i < touches.length; i++)
     {
         let pointer = pointers.find(p => p.id == touches[i].identifier);
-        if (pointer == null) continue;
         updatePointerUpData(pointer);
     }
 });
@@ -1495,17 +1492,18 @@ function updatePointerDownData (pointer, id, posX, posY) {
 }
 
 function updatePointerMoveData (pointer, posX, posY) {
+    pointer.moved = pointer.down;
     pointer.prevTexcoordX = pointer.texcoordX;
     pointer.prevTexcoordY = pointer.texcoordY;
     pointer.texcoordX = posX / canvas.width;
     pointer.texcoordY = 1.0 - posY / canvas.height;
     pointer.deltaX = correctDeltaX(pointer.texcoordX - pointer.prevTexcoordX);
     pointer.deltaY = correctDeltaY(pointer.texcoordY - pointer.prevTexcoordY);
-    pointer.moved = Math.abs(pointer.deltaX) > 0 || Math.abs(pointer.deltaY) > 0;
 }
 
 function updatePointerUpData (pointer) {
-    pointer.down = false;
+    if (!config.CONTINUOUS)
+        pointer.down = false;
 }
 
 function correctDeltaX (delta) {
