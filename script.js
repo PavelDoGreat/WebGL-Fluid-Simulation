@@ -28,15 +28,15 @@ const canvas = document.getElementsByTagName('canvas')[0];
 resizeCanvas();
 
 let config = {
-    SIM_RESOLUTION: 128,
+    SIM_RESOLUTION: 256,
     DYE_RESOLUTION: 1024,
     CAPTURE_RESOLUTION: 512,
-    DENSITY_DISSIPATION: 1,
-    VELOCITY_DISSIPATION: 0.2,
+    DENSITY_DISSIPATION: 0.97,
+    VELOCITY_DISSIPATION: 0.98,
     PRESSURE: 0.8,
     PRESSURE_ITERATIONS: 20,
     CURL: 30,
-    SPLAT_RADIUS: 0.25,
+    SPLAT_RADIUS: 0.3,
     SPLAT_FORCE: 6000,
     SHADING: true,
     COLORFUL: true,
@@ -44,7 +44,7 @@ let config = {
     PAUSED: false,
     BACK_COLOR: { r: 0, g: 0, b: 0 },
     TRANSPARENT: false,
-    BLOOM: true,
+    BLOOM: false,
     BLOOM_ITERATIONS: 8,
     BLOOM_RESOLUTION: 256,
     BLOOM_INTENSITY: 0.8,
@@ -53,6 +53,79 @@ let config = {
     SUNRAYS: true,
     SUNRAYS_RESOLUTION: 196,
     SUNRAYS_WEIGHT: 1.0,
+    SOUND_SENSITIVITY: 0.25,
+    FREQ_RANGE: 8,
+}
+
+var timer = setInterval(randomSplat, 3500);
+var _runRandom = true;
+var _isSleep = false;
+function randomSplat()
+{
+    if(_runRandom == true && _isSleep == false)
+        splatStack.push(parseInt(Math.random() * 20) + 5);
+}
+
+//lively is minimizing browser window to pause.
+//this wont obviously work once I implement proper pause -> todo:- do not call livelyAudioListener() when paused/minimized.
+document.addEventListener("visibilitychange", function() {
+  //alert(document.hidden+ " "+document.visibilityState);
+  _isSleep = document.hidden;
+
+}, false);
+
+let timeout;
+let timeoutBool=true;
+function livelyAudioListener(audioArray)  {
+    if (audioArray[0] > 5 || _isSleep == true)
+    {
+    	_runRandom = true;
+        return;
+    }
+
+    if(audioArray[0]>0.1 && _runRandom){
+        _runRandom = false;
+        clearTimeout(timeout);
+        timeoutBool=true;
+    }
+    else{
+        if(!_runRandom && timeoutBool){
+            timeoutBool=false;
+            timeout=setTimeout(()=>_runRandom=timeoutBool=true,1500);
+        }
+    }
+
+    let bass = 0.0;
+    let half = Math.floor(audioArray.length / 2);
+
+    for (let i = 0; i <= config.FREQ_RANGE; i++) {
+        bass += audioArray[i];
+        bass += audioArray[half + i];
+    }
+    bass /= (config.FREQ_RANGE * 2);
+    multipleSplats(Math.floor((bass * config.SOUND_SENSITIVITY) * 10));
+}
+
+function multipleSplats (amount) {
+    for (let i = 0; i < amount; i++) {
+        const color = config.COLORFUL ? generateColor() : Object.assign({}, config.POINTER_COLOR.getRandom());
+        color.r *= 10.0;
+        color.g *= 10.0;
+        color.b *= 10.0;
+        const x = canvas.width * Math.random();
+        const y = canvas.height * Math.random();
+        const dx = 1000 * (Math.random() - 0.5);
+        const dy = 1000 * (Math.random() - 0.5);
+        splat(x, y, dx, dy, color);
+    }
+}
+
+function generateColor () {
+    let c = HSVtoRGB(Math.random(), 1.0, 1.0);
+    c.r *= 0.15;
+    c.g *= 0.15;
+    c.b *= 0.15;
+    return c;
 }
 
 function pointerPrototype () {
@@ -124,7 +197,6 @@ function getWebGLContext (canvas) {
         formatR = getSupportedFormat(gl, gl.RGBA, gl.RGBA, halfFloatTexType);
     }
 
-    ga('send', 'event', isWebGL2 ? 'webgl2' : 'webgl', formatRGBA == null ? 'not supported' : 'supported');
 
     return {
         gl,
@@ -177,6 +249,7 @@ function supportRenderTextureFormat (gl, internalFormat, format, type) {
 }
 
 function startGUI () {
+	return;
     var gui = new dat.GUI({ width: 300 });
     gui.add(config, 'DYE_RESOLUTION', { 'high': 1024, 'medium': 512, 'low': 256, 'very low': 128 }).name('quality').onFinishChange(initFramebuffers);
     gui.add(config, 'SIM_RESOLUTION', { '32': 32, '64': 64, '128': 128, '256': 256 }).name('sim resolution').onFinishChange(initFramebuffers);
@@ -209,7 +282,6 @@ function startGUI () {
 
     let github = gui.add({ fun : () => {
         window.open('https://github.com/PavelDoGreat/WebGL-Fluid-Simulation');
-        ga('send', 'event', 'link button', 'github');
     } }, 'fun').name('Github');
     github.__li.className = 'cr function bigFont';
     github.__li.style.borderLeft = '3px solid #8C8C8C';
@@ -218,7 +290,6 @@ function startGUI () {
     githubIcon.className = 'icon github';
 
     let twitter = gui.add({ fun : () => {
-        ga('send', 'event', 'link button', 'twitter');
         window.open('https://twitter.com/PavelDoGreat');
     } }, 'fun').name('Twitter');
     twitter.__li.className = 'cr function bigFont';
@@ -228,7 +299,6 @@ function startGUI () {
     twitterIcon.className = 'icon twitter';
 
     let discord = gui.add({ fun : () => {
-        ga('send', 'event', 'link button', 'discord');
         window.open('https://discordapp.com/invite/CeqZDDE');
     } }, 'fun').name('Discord');
     discord.__li.className = 'cr function bigFont';
@@ -238,7 +308,6 @@ function startGUI () {
     discordIcon.className = 'icon discord';
 
     let app = gui.add({ fun : () => {
-        ga('send', 'event', 'link button', 'app');
         window.open('http://onelink.to/5b58bn');
     } }, 'fun').name('Check out mobile app');
     app.__li.className = 'cr function appBigFont';
@@ -1518,14 +1587,6 @@ function correctDeltaY (delta) {
     let aspectRatio = canvas.width / canvas.height;
     if (aspectRatio > 1) delta /= aspectRatio;
     return delta;
-}
-
-function generateColor () {
-    let c = HSVtoRGB(Math.random(), 1.0, 1.0);
-    c.r *= 0.15;
-    c.g *= 0.15;
-    c.b *= 0.15;
-    return c;
 }
 
 function HSVtoRGB (h, s, v) {
