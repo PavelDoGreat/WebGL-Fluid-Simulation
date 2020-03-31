@@ -24,6 +24,35 @@ SOFTWARE.
 
 'use strict';
 
+// Promo code
+
+var promoPopup = document.getElementsByClassName('promo')[0];
+var promoPopupClose = document.getElementsByClassName('promo-close')[0];
+
+if (isMobile()) {
+    setTimeout(function () {
+        promoPopup.style.display = 'table';
+    }, 20000);
+}
+
+promoPopupClose.addEventListener('click', function (e) {
+    promoPopup.style.display = 'none';
+});
+
+var appleLink = document.getElementById('apple_link');
+appleLink.addEventListener('click', function (e) {
+    ga('send', 'event', 'link promo', 'app');
+    window.open('https://apps.apple.com/us/app/fluid-simulation/id1443124993');
+});
+
+var googleLink = document.getElementById('google_link');
+googleLink.addEventListener('click', function (e) {
+    ga('send', 'event', 'link promo', 'app');
+    window.open('https://play.google.com/store/apps/details?id=games.paveldogreat.fluidsimfree');
+});
+
+// Simulation code
+
 var canvas = document.getElementsByTagName('canvas')[0];
 resizeCanvas();
 
