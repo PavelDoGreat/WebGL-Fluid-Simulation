@@ -201,7 +201,7 @@ function supportRenderTextureFormat (gl, internalFormat, format, type) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
 
-    const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+    let status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
     return status == gl.FRAMEBUFFER_COMPLETE;
 }
 
@@ -400,7 +400,7 @@ function createProgram (vertexShader, fragmentShader) {
     gl.linkProgram(program);
 
     if (!gl.getProgramParameter(program, gl.LINK_STATUS))
-        throw gl.getProgramInfoLog(program);
+        console.trace(gl.getProgramInfoLog(program));
 
     return program;
 }
@@ -423,7 +423,7 @@ function compileShader (type, source, keywords) {
     gl.compileShader(shader);
 
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
-        throw gl.getShaderInfoLog(shader);
+        console.trace(gl.getShaderInfoLog(shader));
 
     return shader;
 };
@@ -858,8 +858,10 @@ const vorticityShader = compileShader(gl.FRAGMENT_SHADER, `
         force *= curl * C;
         force.y *= -1.0;
 
-        vec2 vel = texture2D(uVelocity, vUv).xy;
-        gl_FragColor = vec4(vel + force * dt, 0.0, 1.0);
+        vec2 velocity = texture2D(uVelocity, vUv).xy;
+        velocity += force * dt;
+        velocity = min(max(velocity, -1000.0), 1000.0);
+        gl_FragColor = vec4(velocity, 0.0, 1.0);
     }
 `);
 
@@ -934,9 +936,16 @@ const blit = (() => {
             gl.clearColor(0.0, 0.0, 0.0, 1.0);
             gl.clear(gl.COLOR_BUFFER_BIT);
         }
+        // CHECK_FRAMEBUFFER_STATUS();
         gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
     }
 })();
+
+function CHECK_FRAMEBUFFER_STATUS () {
+    let status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+    if (status != gl.FRAMEBUFFER_COMPLETE)
+        console.trace("Framebuffer error: " + status);
+}
 
 let dye;
 let velocity;
