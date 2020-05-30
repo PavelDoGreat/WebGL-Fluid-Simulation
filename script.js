@@ -82,6 +82,9 @@ let config = {
     SUNRAYS: true,
     SUNRAYS_RESOLUTION: 196,
     SUNRAYS_WEIGHT: 1.0,
+    AUTOSPLAT_ENABLED: false,
+    AUTOSPLAT_DELAY: 1,
+    AUTOSPLAT_COUNT: 1
 }
 
 function pointerPrototype () {
@@ -221,6 +224,11 @@ function startGUI () {
     gui.add({ fun: () => {
         splatStack.push(parseInt(Math.random() * 20) + 5);
     } }, 'fun').name('Random splats');
+
+    let autosplatFolder = gui.addFolder('Auto-splat');
+    autosplatFolder.add(config, 'AUTOSPLAT_ENABLED').name('enable auto-splat').listen();    
+    autosplatFolder.add(config, 'AUTOSPLAT_DELAY', 0.1, 30.0).name('auto-splat interval seconds');
+    autosplatFolder.add(config, 'AUTOSPLAT_COUNT', 1, 10, 1).name('number of auto-splats');
 
     let bloomFolder = gui.addFolder('Bloom');
     bloomFolder.add(config, 'BLOOM').name('enabled').onFinishChange(updateKeywords);
@@ -1168,6 +1176,16 @@ function updateKeywords () {
 updateKeywords();
 initFramebuffers();
 multipleSplats(parseInt(Math.random() * 20) + 5);
+
+var autosplat = function() {
+    if(config.AUTOSPLAT_ENABLED && !config.PAUSED) {
+        splatStack.push(config.AUTOSPLAT_COUNT);
+    }
+
+    setTimeout(autosplat, config.AUTOSPLAT_DELAY*1000);
+}
+
+setTimeout(autosplat, config.AUTOSPLAT_DELAY*1000);
 
 let lastUpdateTime = Date.now();
 let colorUpdateTimer = 0.0;
