@@ -70,6 +70,7 @@ let config = {
     SHADING: true,
     COLORFUL: true,
     COLOR_UPDATE_SPEED: 10,
+    CONTINUOUS: false,
     PAUSED: false,
     BACK_COLOR: { r: 0, g: 0, b: 0 },
     TRANSPARENT: false,
@@ -216,6 +217,7 @@ function startGUI () {
     gui.add(config, 'SPLAT_RADIUS', 0.01, 1.0).name('splat radius');
     gui.add(config, 'SHADING').name('shading').onFinishChange(updateKeywords);
     gui.add(config, 'COLORFUL').name('colorful');
+    gui.add(config, 'CONTINUOUS').name('continuous').listen();
     gui.add(config, 'PAUSED').name('paused').listen();
 
     gui.add({ fun: () => {
@@ -1547,7 +1549,8 @@ function updatePointerMoveData (pointer, posX, posY) {
 }
 
 function updatePointerUpData (pointer) {
-    pointer.down = false;
+    if (!config.CONTINUOUS)
+        pointer.down = false;
 }
 
 function correctDeltaX (delta) {
