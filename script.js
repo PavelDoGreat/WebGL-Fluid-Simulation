@@ -206,7 +206,7 @@ function supportRenderTextureFormat (gl, internalFormat, format, type) {
 }
 
 function startGUI () {
-    var gui = new dat.GUI({ width: 350 });
+    var gui = new dat.GUI({ width: 300 });
     gui.add(config, 'DYE_RESOLUTION', { 'high': 1024, 'medium': 512, 'low': 256, 'very low': 128 }).name('quality').onFinishChange(initFramebuffers);
     gui.add(config, 'SIM_RESOLUTION', { '32': 32, '64': 64, '128': 128, '256': 256 }).name('sim resolution').onFinishChange(initFramebuffers);
     gui.add(config, 'DENSITY_DISSIPATION', 0, 4.0).name('density diffusion');
@@ -214,27 +214,27 @@ function startGUI () {
     gui.add(config, 'PRESSURE', 0.0, 1.0).name('pressure');
     gui.add(config, 'CURL', 0, 50).name('vorticity').step(1);
     gui.add(config, 'SPLAT_RADIUS', 0.01, 1.0).name('splat radius');
-    gui.add(config, 'SHADING').name('shading [s]').onFinishChange(updateKeywords).listen();
-    gui.add(config, 'COLORFUL').name('colorful [c]').listen();
-    gui.add(config, 'PAUSED').name('paused [p]').listen();
+    gui.add(config, 'SHADING').name('shading').onFinishChange(updateKeywords);
+    gui.add(config, 'COLORFUL').name('colorful');
+    gui.add(config, 'PAUSED').name('paused').listen();
 
     gui.add({ fun: () => {
         splatStack.push(parseInt(Math.random() * 20) + 5);
-    } }, 'fun').name('Random splats [Space]');
+    } }, 'fun').name('Random splats');
 
     let bloomFolder = gui.addFolder('Bloom');
-    bloomFolder.add(config, 'BLOOM').name('enabled [b]').onFinishChange(updateKeywords).listen();
+    bloomFolder.add(config, 'BLOOM').name('enabled').onFinishChange(updateKeywords);
     bloomFolder.add(config, 'BLOOM_INTENSITY', 0.1, 2.0).name('intensity');
     bloomFolder.add(config, 'BLOOM_THRESHOLD', 0.0, 1.0).name('threshold');
 
     let sunraysFolder = gui.addFolder('Sunrays');
-    sunraysFolder.add(config, 'SUNRAYS').name('enabled [r]').onFinishChange(updateKeywords).listen();
+    sunraysFolder.add(config, 'SUNRAYS').name('enabled').onFinishChange(updateKeywords);
     sunraysFolder.add(config, 'SUNRAYS_WEIGHT', 0.3, 1.0).name('weight');
 
     let captureFolder = gui.addFolder('Capture');
     captureFolder.addColor(config, 'BACK_COLOR').name('background color');
     captureFolder.add(config, 'TRANSPARENT').name('transparent');
-    captureFolder.add({ fun: captureScreenshot }, 'fun').name('take screenshot [q]');
+    captureFolder.add({ fun: captureScreenshot }, 'fun').name('take screenshot');
 
     let github = gui.add({ fun : () => {
         window.open('https://github.com/PavelDoGreat/WebGL-Fluid-Simulation');
@@ -1519,16 +1519,6 @@ window.addEventListener('touchend', e => {
 window.addEventListener('keydown', e => {
     if (e.code === 'KeyP')
         config.PAUSED = !config.PAUSED;
-    if (e.code === 'KeyS')
-        config.SHADING = !config.SHADING;
-    if (e.code === 'KeyC')
-        config.COLORFUL = !config.COLORFUL;
-    if (e.code === 'KeyB')
-        config.BLOOM = !config.BLOOM;
-    if (e.code === 'KeyR')
-        config.SUNRAYS = !config.SUNRAYS;
-    if (e.code === 'KeyQ')
-        captureScreenshot()
     if (e.key === ' ')
         splatStack.push(parseInt(Math.random() * 20) + 5);
 });
