@@ -82,6 +82,9 @@ let config = {
     SUNRAYS: true,
     SUNRAYS_RESOLUTION: 196,
     SUNRAYS_WEIGHT: 1.0,
+    COLOR_RED: true,
+    COLOR_GREEN: true,
+    COLOR_BLUE: true,
 }
 
 function pointerPrototype () {
@@ -230,6 +233,11 @@ function startGUI () {
     let sunraysFolder = gui.addFolder('Sunrays');
     sunraysFolder.add(config, 'SUNRAYS').name('enabled').onFinishChange(updateKeywords);
     sunraysFolder.add(config, 'SUNRAYS_WEIGHT', 0.3, 1.0).name('weight');
+
+    let colorFolder = gui.addFolder('Colors');
+    colorFolder.add(config, 'COLOR_RED').name('Reds')
+    colorFolder.add(config, 'COLOR_GREEN').name('Greens')
+    colorFolder.add(config, 'COLOR_BLUE').name('Blues')
 
     let captureFolder = gui.addFolder('Capture');
     captureFolder.addColor(config, 'BACK_COLOR').name('background color');
@@ -1419,6 +1427,7 @@ function blur (target, temp, iterations) {
 }
 
 function splatPointer (pointer) {
+    if (config.PAUSED) return;
     let dx = pointer.deltaX * config.SPLAT_FORCE;
     let dy = pointer.deltaY * config.SPLAT_FORCE;
     splat(pointer.texcoordX, pointer.texcoordY, dx, dy, pointer.color);
@@ -1563,11 +1572,43 @@ function correctDeltaY (delta) {
 }
 
 function generateColor () {
-    let c = HSVtoRGB(Math.random(), 1.0, 1.0);
-    c.r *= 0.15;
-    c.g *= 0.15;
-    c.b *= 0.15;
-    return c;
+
+    function chooseRed() {
+        var hue = (Math.random() * (1/3)) - (1/6)
+        if (hue >= 0) {
+            return hue
+        } else {
+            return 1 + hue
+        }
+    }
+
+    function chooseGreen() {
+        return (Math.random() * (1/3)) + (1/6)
+    }
+
+    function chooseBlue() {
+        return (Math.random() * (1/3)) + (1/2)
+    }
+
+    let hues = []
+    if (config.COLOR_RED) hues.push(chooseRed())
+    if (config.COLOR_GREEN) hues.push(chooseGreen())
+    if (config.COLOR_BLUE) hues.push(chooseBlue())
+    if (hues.length == 0) {
+        let c = HSVtoRGB(0, 0, 1)
+        c.r *= 0.1;
+        c.g *= 0.1;
+        c.b *= 0.1;
+        return c;
+    } else {
+        let chosenHue = hues[Math.floor(Math.random() * hues.length)]
+
+        let c = HSVtoRGB(chosenHue, 1.0, 1.0);
+        c.r *= 0.15;
+        c.g *= 0.15;
+        c.b *= 0.15;
+        return c;
+    }
 }
 
 function HSVtoRGB (h, s, v) {
