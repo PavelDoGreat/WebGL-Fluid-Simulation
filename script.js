@@ -1419,6 +1419,7 @@ function blur (target, temp, iterations) {
 }
 
 function splatPointer (pointer) {
+    if (config.PAUSED) return;
     let dx = pointer.deltaX * config.SPLAT_FORCE;
     let dy = pointer.deltaY * config.SPLAT_FORCE;
     splat(pointer.texcoordX, pointer.texcoordY, dx, dy, pointer.color);
