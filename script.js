@@ -73,6 +73,7 @@ let config = {
     PAUSED: false,
     BACK_COLOR: { r: 0, g: 0, b: 0 },
     TRANSPARENT: false,
+    BG_IMAGE: false,
     BLOOM: true,
     BLOOM_ITERATIONS: 8,
     BLOOM_RESOLUTION: 256,
@@ -233,6 +234,29 @@ function startGUI () {
 
     let captureFolder = gui.addFolder('Capture');
     captureFolder.addColor(config, 'BACK_COLOR').name('background color');
+    let bgImageController = captureFolder.add({ fun: () => {
+        if (config.BG_IMAGE) {
+            config.BG_IMAGE = false
+            canvas.style.backgroundImage = ""
+            bgImageController.name("background image")
+        } else {
+            var input = document.createElement("input")
+            input.type = "file"
+            input.accept = "image/*"
+            input.style.display = "none"
+            input.addEventListener("change", (e) => {
+                if (e.target.files.length > 0) {
+                    var file = e.target.files[0]
+                    config.BG_IMAGE = true
+                    canvas.style.backgroundImage = `url('${URL.createObjectURL(file)}')`
+                    bgImageController.name("remove image")
+                }
+                input.remove()
+            })
+            document.body.appendChild(input)
+            input.click()
+        }
+    } }, 'fun').name('background image');
     captureFolder.add(config, 'TRANSPARENT').name('transparent');
     captureFolder.add({ fun: captureScreenshot }, 'fun').name('take screenshot');
 
@@ -1309,9 +1333,9 @@ function render (target) {
         gl.disable(gl.BLEND);
     }
 
-    if (!config.TRANSPARENT)
+    if (!config.BG_IMAGE && !config.TRANSPARENT)
         drawColor(target, normalizeColor(config.BACK_COLOR));
-    if (target == null && config.TRANSPARENT)
+    if (!config.BG_IMAGE && target == null && config.TRANSPARENT)
         drawCheckerboard(target);
     drawDisplay(target);
 }
@@ -1419,6 +1443,7 @@ function blur (target, temp, iterations) {
 }
 
 function splatPointer (pointer) {
+    if (config.PAUSED) return;
     let dx = pointer.deltaX * config.SPLAT_FORCE;
     let dy = pointer.deltaY * config.SPLAT_FORCE;
     splat(pointer.texcoordX, pointer.texcoordY, dx, dy, pointer.color);
