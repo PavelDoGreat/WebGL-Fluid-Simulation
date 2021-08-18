@@ -5,8 +5,6 @@ Download: [Fluids_v3.zip](https://github.com/rocksdanister/WebGL-Fluid-Simulatio
 
 Drag & drop the file into lively window.
 
-<img src="/screenshot.jpg?raw=true" width="880">
-
 ## References
 
 http://developer.download.nvidia.com/books/HTML/gpugems/gpugems_ch38.html
