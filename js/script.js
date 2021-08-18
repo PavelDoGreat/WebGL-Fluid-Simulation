@@ -28,15 +28,15 @@ const canvas = document.getElementsByTagName('canvas')[0];
 resizeCanvas();
 
 let config = {
-    SIM_RESOLUTION: 256,
+    SIM_RESOLUTION: 128,
     DYE_RESOLUTION: 1024,
     CAPTURE_RESOLUTION: 512,
-    DENSITY_DISSIPATION: 0.97,
-    VELOCITY_DISSIPATION: 0.98,
+    DENSITY_DISSIPATION: 1,
+    VELOCITY_DISSIPATION: 0.2,
     PRESSURE: 0.8,
     PRESSURE_ITERATIONS: 20,
     CURL: 30,
-    SPLAT_RADIUS: 0.3,
+    SPLAT_RADIUS: 0.25,
     SPLAT_FORCE: 6000,
     SHADING: true,
     COLORFUL: true,
@@ -44,7 +44,7 @@ let config = {
     PAUSED: false,
     BACK_COLOR: { r: 0, g: 0, b: 0 },
     TRANSPARENT: false,
-    BLOOM: false,
+    BLOOM: true,
     BLOOM_ITERATIONS: 8,
     BLOOM_RESOLUTION: 256,
     BLOOM_INTENSITY: 0.8,
@@ -62,7 +62,7 @@ var _runRandom = true;
 var _isSleep = false;
 function randomSplat()
 {
-    if(_runRandom == true && _isSleep == false)
+    if(_runRandom == true && _isSleep == false && _randomSplats)
         splatStack.push(parseInt(Math.random() * 20) + 5);
 }
 
@@ -79,7 +79,11 @@ let timeoutBool=true;
 function livelyAudioListener(audioArray)  {
     if (audioArray[0] > 5 || _isSleep == true)
     {
-    	_runRandom = true;
+        _runRandom = true;
+        return;
+    }
+    if(!_audioReact)
+    {
         return;
     }
 
@@ -128,6 +132,125 @@ function generateColor () {
     return c;
 }
 
+var _randomSplats = false;
+var _audioReact = false;
+var _bgImageChk = false;
+var _bgImagePath = "";
+function livelyPropertyListener(name, val)
+{
+	switch(name) {
+    case "quality":
+    	switch(val){
+	    	case 0:
+	      		config.DYE_RESOLUTION = 1024;
+	    		break;
+	    	case 1:
+	    		config.DYE_RESOLUTION = 512;
+	    		break;
+	    	case 2:
+	    		config.DYE_RESOLUTION = 256;
+	    		break;
+	    	case 3:
+	    		config.DYE_RESOLUTION = 128;
+	    		break;
+    	}
+      initFramebuffers();
+      break;
+	case "simResolution":
+		switch(val){
+			case 0:
+		  		config.SIM_RESOLUTION = 32;
+				break;
+			case 1:
+				config.SIM_RESOLUTION = 64;
+				break;
+			case 2:
+				config.SIM_RESOLUTION = 128;
+				break;
+			case 3:
+				config.SIM_RESOLUTION = 256;
+				break;
+		}
+		initFramebuffers();
+		break;
+	case "densityDiffusion":
+		config.DENSITY_DISSIPATION = val/10;
+		break;
+	case "velocityDiffusion":
+		config.VELOCITY_DISSIPATION = val/100;
+		break;
+	case "pressure":
+		config.PRESSURE = val/100;
+		break;
+	case "vorticity":
+		config.CURL = val;
+		break;
+	case "splatRadius":
+		config.SPLAT_RADIUS = val/100;
+		break;
+	case "shading":
+		config.SHADING = val;
+		updateKeywords();
+		break;
+	case "colorful":
+		config.COLORFUL = val;
+		break;
+	case "bloomEnable":
+		config.BLOOM = val;
+		updateKeywords();
+		break;
+	case "bloomIntensity":
+		config.BLOOM_INTENSITY = val/100;
+		break;
+	case "bloomThreshold":
+		config.BLOOM_THRESHOLD = val/100;
+		break;
+	case "sunRaysEnable":
+		config.SUNRAYS = val;
+		updateKeywords();
+		break;
+	case "sunRaysWeight":
+		config.SUNRAYS_WEIGHT = val/100;
+		break;
+	case "bgColor":
+	    const tmp = hexToRgb(val);
+ 		config.BACK_COLOR.r = tmp.r;
+		config.BACK_COLOR.g = tmp.g;
+		config.BACK_COLOR.b = tmp.b;
+		break;
+	case "bgImgChk":
+        _bgImageChk = val;
+		config.TRANSPARENT = val;
+        if (_bgImageChk)
+        {
+            document.body.style.backgroundImage = "url(" + _bgImagePath.replace('\\', '/') + ")";
+        }
+		break;	
+    case "imgSelect":
+        _bgImagePath = val;
+        if (_bgImageChk)
+        {
+            document.body.style.backgroundImage = "url(" + val.replace('\\', '/') + ")";
+        }
+        break;    
+    case "randomSplats":	
+        _randomSplats = val;
+        break;
+    case "audioReact":    
+        _audioReact = val;
+        break;
+    }
+}
+
+function hexToRgb(hex) {
+  var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : null;
+}
+
 function pointerPrototype () {
     this.id = -1;
     this.texcoordX = 0;
@@ -156,8 +279,6 @@ if (!ext.supportLinearFiltering) {
     config.BLOOM = false;
     config.SUNRAYS = false;
 }
-
-startGUI();
 
 function getWebGLContext (canvas) {
     const params = { alpha: true, depth: false, stencil: false, antialias: false, preserveDrawingBuffer: false };
@@ -196,7 +317,6 @@ function getWebGLContext (canvas) {
         formatRG = getSupportedFormat(gl, gl.RGBA, gl.RGBA, halfFloatTexType);
         formatR = getSupportedFormat(gl, gl.RGBA, gl.RGBA, halfFloatTexType);
     }
-
 
     return {
         gl,
@@ -246,78 +366,6 @@ function supportRenderTextureFormat (gl, internalFormat, format, type) {
 
     const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
     return status == gl.FRAMEBUFFER_COMPLETE;
-}
-
-function startGUI () {
-	return;
-    var gui = new dat.GUI({ width: 300 });
-    gui.add(config, 'DYE_RESOLUTION', { 'high': 1024, 'medium': 512, 'low': 256, 'very low': 128 }).name('quality').onFinishChange(initFramebuffers);
-    gui.add(config, 'SIM_RESOLUTION', { '32': 32, '64': 64, '128': 128, '256': 256 }).name('sim resolution').onFinishChange(initFramebuffers);
-    gui.add(config, 'DENSITY_DISSIPATION', 0, 4.0).name('density diffusion');
-    gui.add(config, 'VELOCITY_DISSIPATION', 0, 4.0).name('velocity diffusion');
-    gui.add(config, 'PRESSURE', 0.0, 1.0).name('pressure');
-    gui.add(config, 'CURL', 0, 50).name('vorticity').step(1);
-    gui.add(config, 'SPLAT_RADIUS', 0.01, 1.0).name('splat radius');
-    gui.add(config, 'SHADING').name('shading').onFinishChange(updateKeywords);
-    gui.add(config, 'COLORFUL').name('colorful');
-    gui.add(config, 'PAUSED').name('paused').listen();
-
-    gui.add({ fun: () => {
-        splatStack.push(parseInt(Math.random() * 20) + 5);
-    } }, 'fun').name('Random splats');
-
-    let bloomFolder = gui.addFolder('Bloom');
-    bloomFolder.add(config, 'BLOOM').name('enabled').onFinishChange(updateKeywords);
-    bloomFolder.add(config, 'BLOOM_INTENSITY', 0.1, 2.0).name('intensity');
-    bloomFolder.add(config, 'BLOOM_THRESHOLD', 0.0, 1.0).name('threshold');
-
-    let sunraysFolder = gui.addFolder('Sunrays');
-    sunraysFolder.add(config, 'SUNRAYS').name('enabled').onFinishChange(updateKeywords);
-    sunraysFolder.add(config, 'SUNRAYS_WEIGHT', 0.3, 1.0).name('weight');
-
-    let captureFolder = gui.addFolder('Capture');
-    captureFolder.addColor(config, 'BACK_COLOR').name('background color');
-    captureFolder.add(config, 'TRANSPARENT').name('transparent');
-    captureFolder.add({ fun: captureScreenshot }, 'fun').name('take screenshot');
-
-    let github = gui.add({ fun : () => {
-        window.open('https://github.com/PavelDoGreat/WebGL-Fluid-Simulation');
-    } }, 'fun').name('Github');
-    github.__li.className = 'cr function bigFont';
-    github.__li.style.borderLeft = '3px solid #8C8C8C';
-    let githubIcon = document.createElement('span');
-    github.domElement.parentElement.appendChild(githubIcon);
-    githubIcon.className = 'icon github';
-
-    let twitter = gui.add({ fun : () => {
-        window.open('https://twitter.com/PavelDoGreat');
-    } }, 'fun').name('Twitter');
-    twitter.__li.className = 'cr function bigFont';
-    twitter.__li.style.borderLeft = '3px solid #8C8C8C';
-    let twitterIcon = document.createElement('span');
-    twitter.domElement.parentElement.appendChild(twitterIcon);
-    twitterIcon.className = 'icon twitter';
-
-    let discord = gui.add({ fun : () => {
-        window.open('https://discordapp.com/invite/CeqZDDE');
-    } }, 'fun').name('Discord');
-    discord.__li.className = 'cr function bigFont';
-    discord.__li.style.borderLeft = '3px solid #8C8C8C';
-    let discordIcon = document.createElement('span');
-    discord.domElement.parentElement.appendChild(discordIcon);
-    discordIcon.className = 'icon discord';
-
-    let app = gui.add({ fun : () => {
-        window.open('http://onelink.to/5b58bn');
-    } }, 'fun').name('Check out mobile app');
-    app.__li.className = 'cr function appBigFont';
-    app.__li.style.borderLeft = '3px solid #00FF7F';
-    let appIcon = document.createElement('span');
-    app.domElement.parentElement.appendChild(appIcon);
-    appIcon.className = 'icon app';
-
-    if (isMobile())
-        gui.close();
 }
 
 function isMobile () {
@@ -1334,8 +1382,8 @@ function render (target) {
     let fbo = target == null ? null : target.fbo;
     if (!config.TRANSPARENT)
         drawColor(fbo, normalizeColor(config.BACK_COLOR));
-    if (target == null && config.TRANSPARENT)
-        drawCheckerboard(fbo);
+    //if (target == null && config.TRANSPARENT)
+        //drawCheckerboard(fbo);
     drawDisplay(fbo, width, height);
 }
 
@@ -1488,16 +1536,35 @@ function correctRadius (radius) {
     return radius;
 }
 
-canvas.addEventListener('mousedown', e => {
-    let posX = scaleByPixelRatio(e.offsetX);
-    let posY = scaleByPixelRatio(e.offsetY);
-    let pointer = pointers.find(p => p.id == -1);
-    if (pointer == null)
-        pointer = new pointerPrototype();
-    updatePointerDownData(pointer, -1, posX, posY);
-});
+// canvas.addEventListener('mousedown', e => {
+//     let posX = scaleByPixelRatio(e.offsetX);
+//     let posY = scaleByPixelRatio(e.offsetY);
+//     let pointer = pointers.find(p => p.id == -1);
+//     if (pointer == null)
+//         pointer = new pointerPrototype();
+//     updatePointerDownData(pointer, -1, posX, posY);
+// });
+let lastMove= -1;
+function checkLastMove(){
+  const currentMove=window.performance.now();
+  if(currentMove-lastMove > 1000){
+    lastMove=currentMove;
+    return true;
+  }
+  return false;
+}
 
 canvas.addEventListener('mousemove', e => {
+
+    if(checkLastMove()){
+      let posX = scaleByPixelRatio(e.offsetX);
+      let posY = scaleByPixelRatio(e.offsetY);
+      let pointer = pointers.find(p => p.id == -1);
+      if (pointer == null)
+          pointer = new pointerPrototype();
+      updatePointerDownData(pointer, -1, posX, posY);
+    }
+
     let pointer = pointers[0];
     if (!pointer.down) return;
     let posX = scaleByPixelRatio(e.offsetX);
@@ -1587,6 +1654,14 @@ function correctDeltaY (delta) {
     let aspectRatio = canvas.width / canvas.height;
     if (aspectRatio > 1) delta /= aspectRatio;
     return delta;
+}
+
+function generateColor () {
+    let c = HSVtoRGB(Math.random(), 1.0, 1.0);
+    c.r *= 0.15;
+    c.g *= 0.15;
+    c.b *= 0.15;
+    return c;
 }
 
 function HSVtoRGB (h, s, v) {

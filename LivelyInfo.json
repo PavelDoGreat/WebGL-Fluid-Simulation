@@ -1,0 +1,12 @@
+{
+  "AppVersion": "0.3.1.0",
+  "Title": "Fluids",
+  "Thumbnail": "fluid.jpg",
+  "Preview": "fluid_preview.gif",
+  "Desc": "Fluid simulation using WebGL, reacts with system audio & cursor.",
+  "Author": "PavelDoGreat",
+  "License": "MIT",
+  "Contact": "https://github.com/rocksdanister/WebGL-Fluid-Simulation",
+  "Type": 2,
+  "FileName": "fluid.html"
+}

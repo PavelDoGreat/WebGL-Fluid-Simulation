@@ -1,0 +1,135 @@
+{
+  "audioReact": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Audio Visualiser"
+  },
+  "randomSplats": {
+    "type": "checkbox",
+    "value": false,
+    "text": "Random Splats"
+  },
+  "quality": {
+    "type": "dropdown",
+    "value": 0,
+    "text": "Quality",
+    "items": [
+      "High",
+      "Medium",
+      "Low",
+      "Very Low"
+    ]
+  },
+  "simResolution": {
+    "type": "dropdown",
+    "value": 2,
+    "text": "Sim Resolution",
+    "items": [
+      "32",
+      "64",
+      "128",
+      "256"
+    ]
+  },
+  "densityDiffusion": {
+    "max": 40,
+    "min": 0,
+    "tick": 41,
+    "text": "Density Diffusion",
+    "type": "slider",
+    "value": 10
+  },
+  "velocityDiffusion": {
+    "max": 400,
+    "min": 0,
+    "tick": 401,
+    "text": "Velocity Diffusion",
+    "type": "slider",
+    "value": 100
+  },
+  "pressure": {
+    "max": 100,
+    "min": 0,
+    "tick": 101,
+    "text": "Pressure",
+    "type": "slider",
+    "value": 10
+  },
+  "vorticity": {
+    "max": 50,
+    "min": 0,
+    "tick": 51,
+    "text": "Vorticity",
+    "type": "slider",
+    "value": 20
+  },
+  "splatRadius": {
+    "max": 100,
+    "min": 1,
+    "tick": 100,
+    "text": "Splat Radius",
+    "type": "slider",
+    "value": 20
+  },
+  "shading": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Shading"
+  },
+  "colorful": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Colorful"
+  },
+  "bloomEnable": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Bloom"
+  },
+  "bloomIntensity": {
+    "max": 200,
+    "min": 10,
+    "tick": 191,
+    "text": "Bloom Intensity",
+    "type": "slider",
+    "value": 15
+  },
+  "bloomThreshold": {
+    "max": 100,
+    "min": 0,
+    "tick": 101,
+    "text": "Bloom Threshold",
+    "type": "slider",
+    "value": 75
+  },
+  "sunRaysEnable": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Sunrays"
+  },
+  "sunRaysWeight": {
+    "max": 100,
+    "min": 30,
+    "tick": 71,
+    "text": "Sunray Weight",
+    "type": "slider",
+    "value": 40
+  },
+  "bgColor": {
+    "text": "BG Color",
+    "type": "color",
+    "value": "#000000"
+  },
+  "imgSelect": {
+    "type": "folderDropdown",
+    "value": "pexels-neosiam-601798.jpg",
+    "text": "Image",
+    "filter": "*.jpg|*.png",
+    "folder": "wallpapers"
+  },
+  "bgImgChk": {
+    "type": "checkbox",
+    "value": false,
+    "text": "Background"
+  },
+}
