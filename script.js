@@ -30,13 +30,13 @@ const canvas = document.getElementsByTagName('canvas')[0];
 resizeCanvas();
 
 let config = {
-    SIM_RESOLUTION: 512,
-    DYE_RESOLUTION: 1024,
-    CAPTURE_RESOLUTION: 512,
+    SIM_RESOLUTION: 128,
+    DYE_RESOLUTION: 128,
+    CAPTURE_RESOLUTION: 128,
     DENSITY_DISSIPATION: 0.1,
     VELOCITY_DISSIPATION: 0.1,
     PRESSURE: 0.0,
-    PRESSURE_ITERATIONS: 20,
+    PRESSURE_ITERATIONS: 10, //20
     CURL: 0,//2
     SPLAT_RADIUS: 0.25,
     SPLAT_FORCE: 6000,
@@ -55,6 +55,10 @@ let config = {
     SUNRAYS: false,
     SUNRAYS_RESOLUTION: 196,
     SUNRAYS_WEIGHT: 0.05,
+    COLLECT_DATA: false,
+    AUTO_SCREEN_CAP_TIME: 5.0,
+    AUTO_SPLAT_TIME: 3.0,
+    DATA_TITLE: "capture"
 }
 
 function pointerPrototype () {
@@ -179,7 +183,7 @@ function supportRenderTextureFormat (gl, internalFormat, format, type) {
 function startGUI () {
     var gui = new dat.GUI({ width: 300 });
     gui.add(config, 'DYE_RESOLUTION', { 'high': 1024, 'medium': 512, 'low': 256, 'very low': 128 }).name('quality').onFinishChange(initFramebuffers);
-    gui.add(config, 'SIM_RESOLUTION', { '32': 32, '64': 64, '128': 128, '256': 256 }).name('sim resolution').onFinishChange(initFramebuffers);
+    gui.add(config, 'SIM_RESOLUTION', { '32': 32, '64': 64, '128': 128, '256': 256, '512': 512 }).name('sim resolution').onFinishChange(initFramebuffers);
     gui.add(config, 'DENSITY_DISSIPATION', 0, 4.0).name('density diffusion');
     gui.add(config, 'VELOCITY_DISSIPATION', 0, 4.0).name('velocity diffusion');
     gui.add(config, 'PRESSURE', 0.0, 1.0).name('pressure');
@@ -193,10 +197,10 @@ function startGUI () {
         splatStack.push(parseInt(Math.random() * 20) + 5);
     } }, 'fun').name('Random splats');
 
-    let bloomFolder = gui.addFolder('Bloom');
-    bloomFolder.add(config, 'BLOOM').name('enabled').onFinishChange(updateKeywords);
-    bloomFolder.add(config, 'BLOOM_INTENSITY', 0.1, 2.0).name('intensity');
-    bloomFolder.add(config, 'BLOOM_THRESHOLD', 0.0, 1.0).name('threshold');
+    //let bloomFolder = gui.addFolder('Bloom');
+    //bloomFolder.add(config, 'BLOOM').name('enabled').onFinishChange(updateKeywords);
+    //bloomFolder.add(config, 'BLOOM_INTENSITY', 0.1, 2.0).name('intensity');
+    //bloomFolder.add(config, 'BLOOM_THRESHOLD', 0.0, 1.0).name('threshold');
 
     let sunraysFolder = gui.addFolder('Sunrays');
     sunraysFolder.add(config, 'SUNRAYS').name('enabled').onFinishChange(updateKeywords);
@@ -206,9 +210,14 @@ function startGUI () {
     captureFolder.addColor(config, 'BACK_COLOR').name('background color');
     captureFolder.add(config, 'TRANSPARENT').name('transparent');
     captureFolder.add({ fun: captureScreenshot }, 'fun').name('take screenshot');
+    captureFolder.add(config, 'CAPTURE_RESOLUTION', { 'high': 1024, 'medium': 512, 'low': 256, 'very low': 128 }).name('quality').onFinishChange(initFramebuffers);
+    captureFolder.add(config, 'COLLECT_DATA').name('collect data').onFinishChange(updateKeywords);
+    captureFolder.add(config, 'AUTO_SCREEN_CAP_TIME', 1.0, 10.0).name('screenshot time (s)').step(0.5);
+    captureFolder.add(config, 'AUTO_SPLAT_TIME', 1.0, 10.0).name('splat time (s)').step(0.5);
+    captureFolder.add(config, 'DATA_TITLE').name('save name');
 
     let github = gui.add({ fun : () => {
-        window.open('https://github.com/eacoleman/WebGL-Fluid-Simulation');
+        window.open('https://github.com/eacoleman/little-earth-sandbox');
         ga('send', 'event', 'link button', 'github');
     } }, 'fun').name('Github');
     github.__li.className = 'cr function bigFont';
@@ -216,36 +225,6 @@ function startGUI () {
     let githubIcon = document.createElement('span');
     github.domElement.parentElement.appendChild(githubIcon);
     githubIcon.className = 'icon github';
-
-    //let twitter = gui.add({ fun : () => {
-    //    ga('send', 'event', 'link button', 'twitter');
-    //    window.open('https://twitter.com/PavelDoGreat');
-    //} }, 'fun').name('Twitter');
-    //twitter.__li.className = 'cr function bigFont';
-    //twitter.__li.style.borderLeft = '3px solid #8C8C8C';
-    //let twitterIcon = document.createElement('span');
-    //twitter.domElement.parentElement.appendChild(twitterIcon);
-    //twitterIcon.className = 'icon twitter';
-
-    //let discord = gui.add({ fun : () => {
-    //    ga('send', 'event', 'link button', 'discord');
-    //    window.open('https://discordapp.com/invite/CeqZDDE');
-    //} }, 'fun').name('Discord');
-    //discord.__li.className = 'cr function bigFont';
-    //discord.__li.style.borderLeft = '3px solid #8C8C8C';
-    //let discordIcon = document.createElement('span');
-    //discord.domElement.parentElement.appendChild(discordIcon);
-    //discordIcon.className = 'icon discord';
-
-    //let app = gui.add({ fun : () => {
-    //    ga('send', 'event', 'link button', 'app');
-    //    window.open('http://onelink.to/5b58bn');
-    //} }, 'fun').name('Check out mobile app');
-    //app.__li.className = 'cr function appBigFont';
-    //app.__li.style.borderLeft = '3px solid #00FF7F';
-    //let appIcon = document.createElement('span');
-    //app.domElement.parentElement.appendChild(appIcon);
-    //appIcon.className = 'icon app';
 
     if (isMobile())
         gui.close();
@@ -265,9 +244,10 @@ function captureScreenshot () {
 
     let captureCanvas = textureToCanvas(texture, target.width, target.height);
     let datauri = captureCanvas.toDataURL();
-    downloadURI('fluid.png', datauri);
+    downloadURI(config.DATA_TITLE+'.png', datauri);
     URL.revokeObjectURL(datauri);
 }
+
 
 function framebufferToTexture (target) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
@@ -419,9 +399,18 @@ const baseVertexShader = compileShader(gl.VERTEX_SHADER, `
     varying vec2 vB;
     uniform vec2 texelSize;
 
+    vec2 pbv (vec2 ttV, vec2 velo) {
+        if(ttV.y >= 1.0 || ttV.y <  0.0) { 
+            return vec2(-velo.x,-velo.y);
+        }
+        else { return velo; }
+    }
+
     vec2 pbc (vec2 ttV) {
-        if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
-        else if(ttV.x < 0.0) { return vec2(1.0,ttV.y); }
+             if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
+        else if(ttV.x <  0.0) { return vec2(1.0,ttV.y); }
+        else if(ttV.y >= 1.0) { return vec2(1.0 - ttV.x,1.0); }
+        else if(ttV.y <  0.0) { return vec2(1.0 - ttV.x,0.0); }
         else { return ttV; }
     }
 
@@ -430,10 +419,9 @@ const baseVertexShader = compileShader(gl.VERTEX_SHADER, `
 
         vL = vec2(vUv.x - texelSize.x, vUv.y);
         vR = vec2(vUv.x + texelSize.x, vUv.y);
-
-
         vT = vec2(vUv.x, vUv.y + texelSize.y);
         vB = vec2(vUv.x, vUv.y - texelSize.y);
+
         gl_Position = vec4(aPosition, 0.0, 1.0);
     }
 `);
@@ -447,17 +435,24 @@ const blurVertexShader = compileShader(gl.VERTEX_SHADER, `
     varying vec2 vR;
     uniform vec2 texelSize;
 
+    vec2 pbv (vec2 ttV, vec2 velo) {
+        if(ttV.y >= 1.0 || ttV.y <  0.0) { 
+            return vec2(-velo.x,-velo.y);
+        }
+        else { return velo; }
+    }
+
     vec2 pbc (vec2 ttV) {
-        if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
-        else if(ttV.x < 0.0) { return vec2(1.0,ttV.y); }
+             if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
+        else if(ttV.x <  0.0) { return vec2(1.0,ttV.y); }
+        else if(ttV.y >= 1.0) { return vec2(1.0 - ttV.x,1.0); }
+        else if(ttV.y <  0.0) { return vec2(1.0 - ttV.x,0.0); }
         else { return ttV; }
     }
 
     void main () {
         vUv = aPosition * 0.5 + 0.5;
         float offset = 1.33333333;
-        //vL = ((vUv.x == 0.0) ? vec2(1.0,vUv.y) : pbc(vUv)) - texelSize * offset;
-        //vR = ((vUv.x == 1.0) ? vec2(0.0,vUv.y) : pbc(vUv)) + texelSize * offset;
         vL = vUv - texelSize * offset;
         vR = vUv + texelSize * offset;
 
@@ -474,9 +469,18 @@ const blurShader = compileShader(gl.FRAGMENT_SHADER, `
     varying vec2 vR;
     uniform sampler2D uTexture;
 
+    vec2 pbv (vec2 ttV, vec2 velo) {
+        if(ttV.y >= 1.0 || ttV.y <  0.0) { 
+            return vec2(-velo.x,-velo.y);
+        }
+        else { return velo; }
+    }
+
     vec2 pbc (vec2 ttV) {
-        if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
-        else if(ttV.x < 0.0) { return vec2(1.0,ttV.y); }
+             if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
+        else if(ttV.x <  0.0) { return vec2(1.0,ttV.y); }
+        else if(ttV.y >= 1.0) { return vec2(1.0 - ttV.x,1.0); }
+        else if(ttV.y <  0.0) { return vec2(1.0 - ttV.x,0.0); }
         else { return ttV; }
     }
 
@@ -495,8 +499,23 @@ const copyShader = compileShader(gl.FRAGMENT_SHADER, `
     varying highp vec2 vUv;
     uniform sampler2D uTexture;
 
+    vec2 pbv (vec2 ttV, vec2 velo) {
+        if(ttV.y >= 1.0 || ttV.y <  0.0) { 
+            return vec2(-velo.x,-velo.y);
+        }
+        else { return velo; }
+    }
+
+    vec2 pbc (vec2 ttV) {
+             if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
+        else if(ttV.x <  0.0) { return vec2(1.0,ttV.y); }
+        else if(ttV.y >= 1.0) { return vec2(1.0 - ttV.x,1.0); }
+        else if(ttV.y <  0.0) { return vec2(1.0 - ttV.x,0.0); }
+        else { return ttV; }
+    }
+
     void main () {
-        gl_FragColor = texture2D(uTexture, vUv);
+        gl_FragColor = texture2D(uTexture, pbc(vUv));
     }
 `);
 
@@ -508,8 +527,23 @@ const clearShader = compileShader(gl.FRAGMENT_SHADER, `
     uniform sampler2D uTexture;
     uniform float value;
 
+    vec2 pbv (vec2 ttV, vec2 velo) {
+        if(ttV.y >= 1.0 || ttV.y <  0.0) { 
+            return vec2(-velo.x,-velo.y);
+        }
+        else { return velo; }
+    }
+
+    vec2 pbc (vec2 ttV) {
+             if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
+        else if(ttV.x <  0.0) { return vec2(1.0,ttV.y); }
+        else if(ttV.y >= 1.0) { return vec2(1.0 - ttV.x,1.0); }
+        else if(ttV.y <  0.0) { return vec2(1.0 - ttV.x,0.0); }
+        else { return ttV; }
+    }
+
     void main () {
-        gl_FragColor = value * texture2D(uTexture, vUv);
+        gl_FragColor = value * texture2D(uTexture, pbc(vUv));
     }
 `);
 
@@ -557,9 +591,18 @@ const displayShaderSource = `
     uniform vec2 ditherScale;
     uniform vec2 texelSize;
 
+    vec2 pbv (vec2 ttV, vec2 velo) {
+        if(ttV.y >= 1.0 || ttV.y <  0.0) { 
+            return vec2(-velo.x,-velo.y);
+        }
+        else { return velo; }
+    }
+
     vec2 pbc (vec2 ttV) {
-        if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
-        else if(ttV.x < 0.0) { return vec2(1.0,ttV.y); }
+             if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
+        else if(ttV.x <  0.0) { return vec2(1.0,ttV.y); }
+        else if(ttV.y >= 1.0) { return vec2(1.0 - ttV.x,1.0); }
+        else if(ttV.y <  0.0) { return vec2(1.0 - ttV.x,0.0); }
         else { return ttV; }
     }
 
@@ -569,7 +612,7 @@ const displayShaderSource = `
     }
 
     void main () {
-        vec3 c = texture2D(uTexture, vUv).rgb;
+        vec3 c = texture2D(uTexture, pbc(vUv)).rgb;
 
     #ifdef SHADING
         vec3 lc = texture2D(uTexture, pbc(vL)).rgb;
@@ -600,7 +643,7 @@ const displayShaderSource = `
     #endif
 
     #ifdef BLOOM
-        float noise = texture2D(uDithering, pbc(vUv) * ditherScale).r;
+        float noise = texture2D(uDithering, pbc(vUv * ditherScale)).r;
         noise = noise * 2.0 - 1.0;
         bloom += noise / 255.0;
         bloom = linearToGamma(bloom);
@@ -621,9 +664,18 @@ const bloomPrefilterShader = compileShader(gl.FRAGMENT_SHADER, `
     uniform vec3 curve;
     uniform float threshold;
 
+    vec2 pbv (vec2 ttV, vec2 velo) {
+        if(ttV.y >= 1.0 || ttV.y <  0.0) { 
+            return vec2(-velo.x,-velo.y);
+        }
+        else { return velo; }
+    }
+
     vec2 pbc (vec2 ttV) {
-        if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
-        else if(ttV.x < 0.0) { return vec2(1.0,ttV.y); }
+             if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
+        else if(ttV.x <  0.0) { return vec2(1.0,ttV.y); }
+        else if(ttV.y >= 1.0) { return vec2(1.0 - ttV.x,1.0); }
+        else if(ttV.y <  0.0) { return vec2(1.0 - ttV.x,0.0); }
         else { return ttV; }
     }
 
@@ -647,9 +699,18 @@ const bloomBlurShader = compileShader(gl.FRAGMENT_SHADER, `
     varying vec2 vB;
     uniform sampler2D uTexture;
 
+    vec2 pbv (vec2 ttV, vec2 velo) {
+        if(ttV.y >= 1.0 || ttV.y <  0.0) { 
+            return vec2(-velo.x,-velo.y);
+        }
+        else { return velo; }
+    }
+
     vec2 pbc (vec2 ttV) {
-        if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
-        else if(ttV.x < 0.0) { return vec2(1.0,ttV.y); }
+             if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
+        else if(ttV.x <  0.0) { return vec2(1.0,ttV.y); }
+        else if(ttV.y >= 1.0) { return vec2(1.0 - ttV.x,1.0); }
+        else if(ttV.y <  0.0) { return vec2(1.0 - ttV.x,0.0); }
         else { return ttV; }
     }
 
@@ -675,9 +736,18 @@ const bloomFinalShader = compileShader(gl.FRAGMENT_SHADER, `
     uniform sampler2D uTexture;
     uniform float intensity;
 
+    vec2 pbv (vec2 ttV, vec2 velo) {
+        if(ttV.y >= 1.0 || ttV.y <  0.0) { 
+            return vec2(-velo.x,-velo.y);
+        }
+        else { return velo; }
+    }
+
     vec2 pbc (vec2 ttV) {
-        if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
-        else if(ttV.x < 0.0) { return vec2(1.0,ttV.y); }
+             if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
+        else if(ttV.x <  0.0) { return vec2(1.0,ttV.y); }
+        else if(ttV.y >= 1.0) { return vec2(1.0 - ttV.x,1.0); }
+        else if(ttV.y <  0.0) { return vec2(1.0 - ttV.x,0.0); }
         else { return ttV; }
     }
 
@@ -699,9 +769,18 @@ const sunraysMaskShader = compileShader(gl.FRAGMENT_SHADER, `
     varying vec2 vUv;
     uniform sampler2D uTexture;
 
+    vec2 pbv (vec2 ttV, vec2 velo) {
+        if(ttV.y >= 1.0 || ttV.y <  0.0) { 
+            return vec2(-velo.x,-velo.y);
+        }
+        else { return velo; }
+    }
+
     vec2 pbc (vec2 ttV) {
-        if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
-        else if(ttV.x < 0.0) { return vec2(1.0,ttV.y); }
+             if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
+        else if(ttV.x <  0.0) { return vec2(1.0,ttV.y); }
+        else if(ttV.y >= 1.0) { return vec2(1.0 - ttV.x,1.0); }
+        else if(ttV.y <  0.0) { return vec2(1.0 - ttV.x,0.0); }
         else { return ttV; }
     }
 
@@ -721,9 +800,18 @@ const sunraysShader = compileShader(gl.FRAGMENT_SHADER, `
     uniform sampler2D uTexture;
     uniform float weight;
 
+    vec2 pbv (vec2 ttV, vec2 velo) {
+        if(ttV.y >= 1.0 || ttV.y <  0.0) { 
+            return vec2(-velo.x,-velo.y);
+        }
+        else { return velo; }
+    }
+
     vec2 pbc (vec2 ttV) {
-        if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
-        else if(ttV.x < 0.0) { return vec2(1.0,ttV.y); }
+             if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
+        else if(ttV.x <  0.0) { return vec2(1.0,ttV.y); }
+        else if(ttV.y >= 1.0) { return vec2(1.0 - ttV.x,1.0); }
+        else if(ttV.y <  0.0) { return vec2(1.0 - ttV.x,0.0); }
         else { return ttV; }
     }
 
@@ -735,7 +823,7 @@ const sunraysShader = compileShader(gl.FRAGMENT_SHADER, `
         float Exposure = 0.7;
 
         vec2 coord = pbc(vUv);
-        vec2 dir = pbc(vUv) - 0.5;
+        vec2 dir = pbc(vUv) - 0.5; // TODO: ISSUE?
 
         dir *= 1.0 / float(ITERATIONS) * Density;
         float illuminationDecay = 1.0;
@@ -765,9 +853,18 @@ const splatShader = compileShader(gl.FRAGMENT_SHADER, `
     uniform vec2 point;
     uniform float radius;
 
+    vec2 pbv (vec2 ttV, vec2 velo) {
+        if(ttV.y >= 1.0 || ttV.y <  0.0) { 
+            return vec2(-velo.x,-velo.y);
+        }
+        else { return velo; }
+    }
+
     vec2 pbc (vec2 ttV) {
-        if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
-        else if(ttV.x < 0.0) { return vec2(1.0,ttV.y); }
+             if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
+        else if(ttV.x <  0.0) { return vec2(1.0,ttV.y); }
+        else if(ttV.y >= 1.0) { return vec2(1.0 - ttV.x,1.0); }
+        else if(ttV.y <  0.0) { return vec2(1.0 - ttV.x,0.0); }
         else { return ttV; }
     }
 
@@ -792,9 +889,18 @@ const advectionShader = compileShader(gl.FRAGMENT_SHADER, `
     uniform float dt;
     uniform float dissipation;
 
+    vec2 pbv (vec2 ttV, vec2 velo) {
+        if(ttV.y >= 1.0 || ttV.y <  0.0) { 
+            return vec2(-velo.x,-velo.y);
+        }
+        else { return velo; }
+    }
+
     vec2 pbc (vec2 ttV) {
-        if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
-        else if(ttV.x < 0.0) { return vec2(1.0,ttV.y); }
+             if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
+        else if(ttV.x <  0.0) { return vec2(1.0,ttV.y); }
+        else if(ttV.y >= 1.0) { return vec2(1.0 - ttV.x,1.0); }
+        else if(ttV.y <  0.0) { return vec2(1.0 - ttV.x,0.0); }
         else { return ttV; }
     }
 
@@ -823,7 +929,7 @@ const advectionShader = compileShader(gl.FRAGMENT_SHADER, `
         vec2 coord = vUv - dt * bilerp(uVelocity, vUv, texelSize).xy * texelSize;
         vec4 result = bilerp(uSource, coord, dyeTexelSize);
     #else
-        vec2 coord = pbc(vUv) - dt * texture2D(uVelocity, pbc(vUv)).xy * texelSize;
+        vec2 coord = vUv - dt * pbv(vUv,texture2D(uVelocity, vUv).xy) * texelSize;
         vec4 result = texture2D(uSource, pbc(coord));
     #endif
         float decay = 1.0 + dissipation * dt;
@@ -843,9 +949,18 @@ const divergenceShader = compileShader(gl.FRAGMENT_SHADER, `
     varying highp vec2 vB;
     uniform sampler2D uVelocity;
 
+    vec2 pbv (vec2 ttV, vec2 velo) {
+        if(ttV.y >= 1.0 || ttV.y <  0.0) { 
+            return vec2(-velo.x,-velo.y);
+        }
+        else { return velo; }
+    }
+
     vec2 pbc (vec2 ttV) {
-        if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
-        else if(ttV.x < 0.0) { return vec2(1.0,ttV.y); }
+             if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
+        else if(ttV.x <  0.0) { return vec2(1.0,ttV.y); }
+        else if(ttV.y >= 1.0) { return vec2(1.0 - ttV.x,1.0); }
+        else if(ttV.y <  0.0) { return vec2(1.0 - ttV.x,0.0); }
         else { return ttV; }
     }
 
@@ -855,9 +970,16 @@ const divergenceShader = compileShader(gl.FRAGMENT_SHADER, `
         float T = texture2D(uVelocity, pbc(vT)).y;
         float B = texture2D(uVelocity, pbc(vB)).y;
 
-        vec2 C = texture2D(uVelocity, pbc(vUv)).xy;
-        if (vT.y > 1.0) { T = -C.y; }
-        if (vB.y < 0.0) { B = -C.y; }
+        if (vT.y >= 1.0) { 
+            T = -T; 
+            L = -texture2D(uVelocity, pbc(vR + vT - vUv)).x; 
+            R = -texture2D(uVelocity, pbc(vL + vT - vUv)).x;
+        }
+        if (vB.y < 0.0) { 
+            B = -B;
+            L = -texture2D(uVelocity, pbc(vR + vB - vUv)).x; 
+            R = -texture2D(uVelocity, pbc(vL + vB - vUv)).x; 
+        }
 
         float div = 0.5 * (R - L + T - B);
         gl_FragColor = vec4(div, 0.0, 0.0, 1.0);
@@ -875,9 +997,18 @@ const curlShader = compileShader(gl.FRAGMENT_SHADER, `
     varying highp vec2 vB;
     uniform sampler2D uVelocity;
 
+    vec2 pbv (vec2 ttV, vec2 velo) {
+        if(ttV.y >= 1.0 || ttV.y <  0.0) { 
+            return vec2(-velo.x,-velo.y);
+        }
+        else { return velo; }
+    }
+
     vec2 pbc (vec2 ttV) {
-        if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
-        else if(ttV.x < 0.0) { return vec2(1.0,ttV.y); }
+             if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
+        else if(ttV.x <  0.0) { return vec2(1.0,ttV.y); }
+        else if(ttV.y >= 1.0) { return vec2(1.0 - ttV.x,1.0); }
+        else if(ttV.y <  0.0) { return vec2(1.0 - ttV.x,0.0); }
         else { return ttV; }
     }
 
@@ -886,7 +1017,20 @@ const curlShader = compileShader(gl.FRAGMENT_SHADER, `
         float R = texture2D(uVelocity, pbc(vR)).y;
         float T = texture2D(uVelocity, pbc(vT)).x;
         float B = texture2D(uVelocity, pbc(vB)).x;
+        
+        if (vT.y >= 1.0) { 
+            T = -T; 
+            L = -texture2D(uVelocity, pbc(vR + vT - vUv)).y; 
+            R = -texture2D(uVelocity, pbc(vL + vT - vUv)).y;
+        }
+        if (vB.y < 0.0) { 
+            B = -B;
+            L = -texture2D(uVelocity, pbc(vR + vB - vUv)).y; 
+            R = -texture2D(uVelocity, pbc(vL + vB - vUv)).y; 
+        }
+
         float vorticity = R - L - T + B;
+
         gl_FragColor = vec4(0.5 * vorticity, 0.0, 0.0, 1.0);
     }
 `);
@@ -905,9 +1049,18 @@ const vorticityShader = compileShader(gl.FRAGMENT_SHADER, `
     uniform float curl;
     uniform float dt;
 
+    vec2 pbv (vec2 ttV, vec2 velo) {
+        if(ttV.y >= 1.0 || ttV.y <  0.0) { 
+            return vec2(-velo.x,-velo.y);
+        }
+        else { return velo; }
+    }
+
     vec2 pbc (vec2 ttV) {
-        if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
-        else if(ttV.x < 0.0) { return vec2(1.0,ttV.y); }
+             if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
+        else if(ttV.x <  0.0) { return vec2(1.0,ttV.y); }
+        else if(ttV.y >= 1.0) { return vec2(1.0 - ttV.x,1.0); }
+        else if(ttV.y <  0.0) { return vec2(1.0 - ttV.x,0.0); }
         else { return ttV; }
     }
 
@@ -942,9 +1095,18 @@ const pressureShader = compileShader(gl.FRAGMENT_SHADER, `
     uniform sampler2D uPressure;
     uniform sampler2D uDivergence;
 
+    vec2 pbv (vec2 ttV, vec2 velo) {
+        if(ttV.y >= 1.0 || ttV.y <  0.0) { 
+            return vec2(-velo.x,-velo.y);
+        }
+        else { return velo; }
+    }
+
     vec2 pbc (vec2 ttV) {
-        if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
-        else if(ttV.x < 0.0) { return vec2(1.0,ttV.y); }
+             if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
+        else if(ttV.x <  0.0) { return vec2(1.0,ttV.y); }
+        else if(ttV.y >= 1.0) { return vec2(1.0 - ttV.x,1.0); }
+        else if(ttV.y <  0.0) { return vec2(1.0 - ttV.x,0.0); }
         else { return ttV; }
     }
 
@@ -953,7 +1115,17 @@ const pressureShader = compileShader(gl.FRAGMENT_SHADER, `
         float R = texture2D(uPressure, pbc(vR)).x;
         float T = texture2D(uPressure, pbc(vT)).x;
         float B = texture2D(uPressure, pbc(vB)).x;
-        float C = texture2D(uPressure, pbc(vUv)).x;
+
+        if (vT.y >= 1.0) { 
+            L = texture2D(uPressure, pbc(vR + vT - vUv)).x; 
+            R = texture2D(uPressure, pbc(vL + vT - vUv)).x;
+        }
+        if (vB.y < 0.0) { 
+            L = texture2D(uPressure, pbc(vR + vB - vUv)).x; 
+            R = texture2D(uPressure, pbc(vL + vB - vUv)).x; 
+        }
+
+
         float divergence = texture2D(uDivergence, pbc(vUv)).x;
         float pressure = (L + R + B + T - divergence) * 0.25;
         gl_FragColor = vec4(pressure, 0.0, 0.0, 1.0);
@@ -972,9 +1144,18 @@ const gradientSubtractShader = compileShader(gl.FRAGMENT_SHADER, `
     uniform sampler2D uPressure;
     uniform sampler2D uVelocity;
 
+    vec2 pbv (vec2 ttV, vec2 velo) {
+        if(ttV.y >= 1.0 || ttV.y <  0.0) { 
+            return vec2(-velo.x,-velo.y);
+        }
+        else { return velo; }
+    }
+
     vec2 pbc (vec2 ttV) {
-        if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
-        else if(ttV.x < 0.0) { return vec2(1.0,ttV.y); }
+             if(ttV.x >= 1.0) { return vec2(0.0,ttV.y); }
+        else if(ttV.x <  0.0) { return vec2(1.0,ttV.y); }
+        else if(ttV.y >= 1.0) { return vec2(1.0 - ttV.x,1.0); }
+        else if(ttV.y <  0.0) { return vec2(1.0 - ttV.x,0.0); }
         else { return ttV; }
     }
 
@@ -983,7 +1164,17 @@ const gradientSubtractShader = compileShader(gl.FRAGMENT_SHADER, `
         float R = texture2D(uPressure, pbc(vR)).x;
         float T = texture2D(uPressure, pbc(vT)).x;
         float B = texture2D(uPressure, pbc(vB)).x;
-        vec2 velocity = texture2D(uVelocity, pbc(vUv)).xy;
+        vec2 velocity = pbv(vUv,texture2D(uVelocity, pbc(vUv)).xy);
+
+        if (vT.y >= 1.0) { 
+            L = texture2D(uPressure, pbc(vR + vT - vUv)).x; 
+            R = texture2D(uPressure, pbc(vL + vT - vUv)).x;
+        }
+        if (vB.y < 0.0) { 
+            L = texture2D(uPressure, pbc(vR + vB - vUv)).x; 
+            R = texture2D(uPressure, pbc(vL + vB - vUv)).x; 
+        }
+
         velocity.xy -= vec2(R - L, T - B);
 
         gl_FragColor = vec4(velocity, 0.0, 1.0);
@@ -1249,12 +1440,18 @@ multipleSplats(parseInt(Math.random() * 20) + 5);
 
 let lastUpdateTime = Date.now();
 let colorUpdateTimer = 0.0;
+let autoSplatTime = 0.0;
+let autoScreenCaptureTime = 0.0;
 update();
 
 function update () {
     const dt = calcDeltaTime();
     if (resizeCanvas())
         initFramebuffers();
+
+    if (config.COLLECT_DATA)
+        collectData(dt);
+
     updateColors(dt);
     applyInputs();
     if (!config.PAUSED)
@@ -1301,6 +1498,74 @@ function updateColors (dt) {
             p.color = generateColor();
         });
     }
+}
+
+function collectData (dt) {
+    autoSplatTime += dt;
+    autoScreenCaptureTime += dt;
+
+    //every XX seconds, inject energy
+    if(autoSplatTime > config.AUTO_SPLAT_TIME) {
+        multipleSplats(parseInt(Math.random() * 20) + 5);
+        autoSplatTime = 0.0;
+    }
+
+    //every XX seconds, capture screenshot
+    if(autoScreenCaptureTime > config.AUTO_SCREEN_CAP_TIME) {
+        //pause simulation
+        config.PAUSED = true;
+
+        //save image 
+        let res = getResolution(config.CAPTURE_RESOLUTION);
+        let target = createFBO(res.width, res.height, ext.formatRGBA.internalFormat, ext.formatRGBA.format, ext.halfFloatTexType, gl.NEAREST);
+        render(target);
+    
+        let texture = framebufferToTexture(target);
+        texture = normalizeTexture(texture, target.width, target.height);
+    
+        let captureCanvas = textureToCanvas(texture, target.width, target.height);
+        captureCanvas.toBlob(function(blob) {
+            saveAs(blob, config.DATA_TITLE+".png");
+        });
+
+        //same for velocity;
+        saveDoubleFBOCapture(velocity,config.DATA_TITLE+"_v.png")
+
+        //same for pressure;
+        saveDoubleFBOCapture(pressure,config.DATA_TITLE+"_p.png")
+
+        //different for divergence, which is a single FBO;
+        saveSingleFBOCapture(divergence,config.DATA_TITLE+"_d.png")
+
+        //different for curl, which is a single FBO;
+        saveSingleFBOCapture(curl,config.DATA_TITLE+"_c.png")
+
+        config.PAUSED = false;
+        autoScreenCaptureTime = 0.0;
+    }
+
+}
+
+function saveDoubleFBOCapture(dubFBO, saveName) {
+    let target = dubFBO.write
+    render(target,dubFBO.read)
+    let texture = framebufferToTexture(target);
+    texture = normalizeTexture(texture, target.width, target.height);
+
+    let captureCanvas = textureToCanvas(texture, target.width, target.height);
+    captureCanvas.toBlob(function(blob) {
+        saveAs(blob, saveName);
+    });
+}
+
+function saveSingleFBOCapture(sinFBO, saveName) {
+    let texture = framebufferToTexture(sinFBO);
+    texture = normalizeTexture(texture, sinFBO.width, sinFBO.height);
+    
+    let captureCanvas = textureToCanvas(texture, sinFBO.width, sinFBO.height);
+    captureCanvas.toBlob(function(blob) {
+        saveAs(blob, saveName);
+    });
 }
 
 function applyInputs () {
@@ -1380,12 +1645,14 @@ function step (dt) {
     dye.swap();
 }
 
-function render (target) {
-    if (config.BLOOM)
-        applyBloom(dye.read, bloom);
-    if (config.SUNRAYS) {
-        applySunrays(dye.read, dye.write, sunrays);
-        blur(sunrays, sunraysTemp, 1);
+function render (target, vecs=dye.read) {
+    if(vecs == dye.read) {
+        if (config.BLOOM)
+            applyBloom(dye.read, bloom);
+        if (config.SUNRAYS) {
+            applySunrays(dye.read, dye.write, sunrays);
+            blur(sunrays, sunraysTemp, 1);
+        }
     }
 
     if (target == null || !config.TRANSPARENT) {
@@ -1397,11 +1664,12 @@ function render (target) {
     }
 
     if (!config.TRANSPARENT)
-        drawColor(target, normalizeColor(config.BACK_COLOR));
+        if(vecs == dye.read) { drawColor(target, normalizeColor(config.BACK_COLOR)); }
+        else                 { drawColor(target, normalizeColor({r: 0, g: 0, b: 0})); }
     if (target == null && config.TRANSPARENT)
         drawCheckerboard(target);
         //EAC drawImage
-    drawDisplay(target);
+    drawDisplay(target, vecs);
 }
 
 function drawImage (target,color) {
@@ -1422,22 +1690,26 @@ function drawCheckerboard (target) {
     blit(target);
 }
 
-function drawDisplay (target) {
+function drawDisplay (target, vecs=dye.read) {
     let width = target == null ? gl.drawingBufferWidth : target.width;
     let height = target == null ? gl.drawingBufferHeight : target.height;
 
     displayMaterial.bind();
-    if (config.SHADING)
+    if (config.SHADING && vecs == dye.read)
         gl.uniform2f(displayMaterial.uniforms.texelSize, 1.0 / width, 1.0 / height);
-    gl.uniform1i(displayMaterial.uniforms.uTexture, dye.read.attach(0));
-    if (config.BLOOM) {
+
+    gl.uniform1i(displayMaterial.uniforms.uTexture, vecs.attach(0));
+    
+    if (config.BLOOM && vecs == dye.read) {
         gl.uniform1i(displayMaterial.uniforms.uBloom, bloom.attach(1));
         gl.uniform1i(displayMaterial.uniforms.uDithering, ditheringTexture.attach(2));
         let scale = getTextureScale(ditheringTexture, width, height);
         gl.uniform2f(displayMaterial.uniforms.ditherScale, scale.x, scale.y);
     }
-    if (config.SUNRAYS)
+    
+    if (config.SUNRAYS && vecs == dye.read)
         gl.uniform1i(displayMaterial.uniforms.uSunrays, sunrays.attach(3));
+    
     blit(target);
 }
 
