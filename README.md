@@ -14,6 +14,8 @@ This simulator has a basic functionality to generate lots of random fluid data, 
 ![sample image: curl field](documentation/automation_curl.png)
 ![sample image: divergence field](documentation/automation_divergence.png)
 
+To avoid being prompted each time you'd like to save a file, you can do so in Chrome by going into Settings > Advanced > Downloads. Then, disable "Ask where to save each file before downloading." Captures will be saved to your Downloads folder.
+
 ## License
 
 The code is available under the [MIT license](LICENSE).
