@@ -1442,6 +1442,7 @@ let lastUpdateTime = Date.now();
 let colorUpdateTimer = 0.0;
 let autoSplatTime = 0.0;
 let autoScreenCaptureTime = 0.0;
+let autoScreenCapNum = 1;
 update();
 
 function update () {
@@ -1525,23 +1526,24 @@ function collectData (dt) {
     
         let captureCanvas = textureToCanvas(texture, target.width, target.height);
         captureCanvas.toBlob(function(blob) {
-            saveAs(blob, config.DATA_TITLE+".png");
+            saveAs(blob, config.DATA_TITLE+"_"+autoScreenCapNum+".png");
         });
 
         //same for velocity;
-        saveDoubleFBOCapture(velocity,config.DATA_TITLE+"_v.png")
+        saveDoubleFBOCapture(velocity,config.DATA_TITLE+"_v_"+autoScreenCapNum+".png")
 
         //same for pressure;
-        saveDoubleFBOCapture(pressure,config.DATA_TITLE+"_p.png")
+        saveDoubleFBOCapture(pressure,config.DATA_TITLE+"_p_"+autoScreenCapNum+".png")
 
         //different for divergence, which is a single FBO;
-        saveSingleFBOCapture(divergence,config.DATA_TITLE+"_d.png")
+        saveSingleFBOCapture(divergence,config.DATA_TITLE+"_d_"+autoScreenCapNum+".png")
 
         //different for curl, which is a single FBO;
-        saveSingleFBOCapture(curl,config.DATA_TITLE+"_c.png")
+        saveSingleFBOCapture(curl,config.DATA_TITLE+"_c_"+autoScreenCapNum+".png")
 
         config.PAUSED = false;
         autoScreenCaptureTime = 0.0;
+        autoScreenCapNum++;
     }
 
 }
