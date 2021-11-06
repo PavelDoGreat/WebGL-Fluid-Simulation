@@ -1501,9 +1501,11 @@ function updateColors (dt) {
     }
 }
 
+
+let screenCapPaused = false;
 function collectData (dt) {
     autoSplatTime += dt;
-    autoScreenCaptureTime += dt;
+    autoScreenCaptureTime += dt*!screenCapPaused;
 
     //every XX seconds, inject energy
     if(autoSplatTime > config.AUTO_SPLAT_TIME) {
@@ -1512,9 +1514,12 @@ function collectData (dt) {
     }
 
     //every XX seconds, capture screenshot
-    if(autoScreenCaptureTime > config.AUTO_SCREEN_CAP_TIME) {
+    if(autoScreenCaptureTime > config.AUTO_SCREEN_CAP_TIME && !screenCapPaused) {
         //pause simulation
         config.PAUSED = true;
+        screenCapPaused = true;
+
+        let tExt = autoScreenCapNum+".png";
 
         //save image 
         let res = getResolution(config.CAPTURE_RESOLUTION);
@@ -1526,22 +1531,23 @@ function collectData (dt) {
     
         let captureCanvas = textureToCanvas(texture, target.width, target.height);
         captureCanvas.toBlob(function(blob) {
-            saveAs(blob, config.DATA_TITLE+"_"+autoScreenCapNum+".png");
+            saveAs(blob, config.DATA_TITLE+"_"+tExt);
         });
 
         //same for velocity;
-        saveDoubleFBOCapture(velocity,config.DATA_TITLE+"_v_"+autoScreenCapNum+".png")
+        saveDoubleFBOCapture(velocity,config.DATA_TITLE+"_v_"+tExt)
 
         //same for pressure;
-        saveDoubleFBOCapture(pressure,config.DATA_TITLE+"_p_"+autoScreenCapNum+".png")
+        saveDoubleFBOCapture(pressure,config.DATA_TITLE+"_p_"+tExt)
 
         //different for divergence, which is a single FBO;
-        saveSingleFBOCapture(divergence,config.DATA_TITLE+"_d_"+autoScreenCapNum+".png")
+        saveSingleFBOCapture(divergence,config.DATA_TITLE+"_d_"+tExt)
 
         //different for curl, which is a single FBO;
-        saveSingleFBOCapture(curl,config.DATA_TITLE+"_c_"+autoScreenCapNum+".png")
+        saveSingleFBOCapture(curl,config.DATA_TITLE+"_c_"+tExt)
 
         config.PAUSED = false;
+        screenCapPaused = false;
         autoScreenCaptureTime = 0.0;
         autoScreenCapNum++;
     }
