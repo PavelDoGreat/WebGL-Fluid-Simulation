@@ -273,8 +273,28 @@ function normalizeTexture (texture, width, height) {
     return result;
 }
 
+function normalizeTexture1000 (texture, width, height) {
+    let result = new Uint8Array(texture.length);
+    let id = 0;
+    for (let i = height - 1; i >= 0; i--) {
+        for (let j = 0; j < width; j++) {
+            let nid = i * width * 4 + j * 4;
+            result[nid + 0] = clampAround0p5(texture[id + 0]) * 255;
+            result[nid + 1] = clampAround0p5(texture[id + 1]) * 255;
+            result[nid + 2] = clampAround0p5(texture[id + 2]) * 255;
+            result[nid + 3] = clampAround0p5(texture[id + 3]) * 255;
+            id += 4;
+        }
+    }
+    return result;
+}
+
 function clamp01 (input) {
     return Math.min(Math.max(input, 0), 1);
+}
+
+function clampAround0p5 (input) {
+    return clamp01(input/100.0 + 0.5);
 }
 
 function textureToCanvas (texture, width, height) {
@@ -1558,7 +1578,7 @@ function saveDoubleFBOCapture(dubFBO, saveName) {
     let target = dubFBO.write
     render(target,dubFBO.read)
     let texture = framebufferToTexture(target);
-    texture = normalizeTexture(texture, target.width, target.height);
+    texture = normalizeTexture1000(texture, target.width, target.height);
 
     let captureCanvas = textureToCanvas(texture, target.width, target.height);
     captureCanvas.toBlob(function(blob) {
@@ -1568,7 +1588,7 @@ function saveDoubleFBOCapture(dubFBO, saveName) {
 
 function saveSingleFBOCapture(sinFBO, saveName) {
     let texture = framebufferToTexture(sinFBO);
-    texture = normalizeTexture(texture, sinFBO.width, sinFBO.height);
+    texture = normalizeTexture1000(texture, sinFBO.width, sinFBO.height);
     
     let captureCanvas = textureToCanvas(texture, sinFBO.width, sinFBO.height);
     captureCanvas.toBlob(function(blob) {
