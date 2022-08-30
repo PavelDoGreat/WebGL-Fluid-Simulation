@@ -102,19 +102,12 @@ function livelyAudioListener(audioArray)  {
     }
 
     let bass = 0.0;
-    let half = Math.floor(audioArray.length / 2);
-
 
     for (let i = 0; i <= config.FREQ_RANGE; i++) 
-      bass += audioArray[i];
+      bass += audioArray[i]*2;
       
-    console.log(bass)
-    bass *= 2;
-    console.log(bass)
-
     bass /= (config.FREQ_RANGE * 2) * config.FREQ_MULTI;
-
-    console.log(bass,Math.floor((bass * config.SOUND_SENSITIVITY) * 10 ));
+    
     multipleSplats(Math.floor((bass * config.SOUND_SENSITIVITY) * 10)-lastBass);
     lastBass = (bass,Math.floor((bass * config.SOUND_SENSITIVITY) * 10 ));
 }
