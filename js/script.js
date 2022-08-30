@@ -134,10 +134,10 @@ function generateColor () {
     return c;
 }
 
-var _randomSplats = false;
-var _audioReact = true;
-var _bgImageChk = false;
-var _bgImagePath = "";
+let _randomSplats = false;
+let _audioReact = false;
+let _bgImageChk = false;
+let _bgImagePath = "";
 function livelyPropertyListener(name, val)
 {
 	switch(name) {
@@ -245,7 +245,7 @@ function livelyPropertyListener(name, val)
 }
 
 function hexToRgb(hex) {
-  var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result ? {
     r: parseInt(result[1], 16),
     g: parseInt(result[2], 16),
