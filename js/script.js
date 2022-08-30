@@ -1538,14 +1538,14 @@ function correctRadius (radius) {
     return radius;
 }
 
-// canvas.addEventListener('mousedown', e => {
-//     let posX = scaleByPixelRatio(e.offsetX);
-//     let posY = scaleByPixelRatio(e.offsetY);
-//     let pointer = pointers.find(p => p.id == -1);
-//     if (pointer == null)
-//         pointer = new pointerPrototype();
-//     updatePointerDownData(pointer, -1, posX, posY);
-// });
+canvas.addEventListener('mousedown', e => {
+    let posX = scaleByPixelRatio(e.offsetX);
+    let posY = scaleByPixelRatio(e.offsetY);
+    let pointer = pointers.find(p => p.id == -1);
+    if (pointer == null)
+        pointer = new pointerPrototype();
+    updatePointerDownData(pointer, -1, posX, posY);
+});
 let lastMove= -1;
 function checkLastMove(){
   const currentMove=window.performance.now();
