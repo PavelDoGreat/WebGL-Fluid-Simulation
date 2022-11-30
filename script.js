@@ -1,50 +1,37 @@
-/*
-MIT License
-
-Copyright (c) 2017 Pavel Dobryakov
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-*/
 
 'use strict';
 
 // Mobile promo section
 
+
+//accesss element by searching html tree 
 const promoPopup = document.getElementsByClassName('promo')[0];
 const promoPopupClose = document.getElementsByClassName('promo-close')[0];
 
+
+//test if the user is accessing from a mobile device 
 if (isMobile()) {
     setTimeout(() => {
         promoPopup.style.display = 'table';
     }, 20000);
 }
 
+//callback fxn to listen for click event on the "Close" x on the popup
+//notice we are listening for callback from the promo-close element, but the action is taken on the main promo element 
 promoPopupClose.addEventListener('click', e => {
     promoPopup.style.display = 'none';
 });
 
+
+//callback to listen for click on link 
 const appleLink = document.getElementById('apple_link');
 appleLink.addEventListener('click', e => {
     ga('send', 'event', 'link promo', 'app');
+    //define what link to actually open when this element is clicked 
     window.open('https://apps.apple.com/us/app/fluid-simulation/id1443124993');
 });
 
+//callback for link 
 const googleLink = document.getElementById('google_link');
 googleLink.addEventListener('click', e => {
     ga('send', 'event', 'link promo', 'app');
@@ -53,13 +40,17 @@ googleLink.addEventListener('click', e => {
 
 // Simulation section
 
+//this is like selenium, where the fxn will return a list of elements that meet your search criteria 
 const canvas = document.getElementsByTagName('canvas')[0];
+//function that will adjust canvas bounds in case screen size changes 
 resizeCanvas();
 
+
+//inital config for sim params 
 let config = {
-    SIM_RESOLUTION: 128,
-    DYE_RESOLUTION: 1024,
-    CAPTURE_RESOLUTION: 512,
+    SIM_RESOLUTION: 128, //simres
+    DYE_RESOLUTION: 1024, //output res 
+    CAPTURE_RESOLUTION: 512, //screen capture res 
     DENSITY_DISSIPATION: 1,
     VELOCITY_DISSIPATION: 0.2,
     PRESSURE: 0.8,
@@ -84,6 +75,9 @@ let config = {
     SUNRAYS_WEIGHT: 1.0,
 }
 
+
+//create a prototype data structure for our pointers (ie a click or touch)
+//we want to be a able to have more than one in the case of a multi - touch input 
 function pointerPrototype () {
     this.id = -1;
     this.texcoordX = 0;
@@ -97,15 +91,22 @@ function pointerPrototype () {
     this.color = [30, 0, 300];
 }
 
+//initialize arrays 
 let pointers = [];
 let splatStack = [];
+
+
+//add first pointer the array of pointers 
 pointers.push(new pointerPrototype());
 
+//create webgl context 
 const { gl, ext } = getWebGLContext(canvas);
 
+//set output res on mobile 
 if (isMobile()) {
     config.DYE_RESOLUTION = 512;
 }
+//if the supported version of webgl does not support these features, turn off 
 if (!ext.supportLinearFiltering) {
     config.DYE_RESOLUTION = 512;
     config.SHADING = false;
@@ -113,16 +114,19 @@ if (!ext.supportLinearFiltering) {
     config.SUNRAYS = false;
 }
 
+//start gui
 startGUI();
 
 function getWebGLContext (canvas) {
     const params = { alpha: true, depth: false, stencil: false, antialias: false, preserveDrawingBuffer: false };
 
+    //get webgl context. note webgl2
     let gl = canvas.getContext('webgl2', params);
     const isWebGL2 = !!gl;
     if (!isWebGL2)
         gl = canvas.getContext('webgl', params) || canvas.getContext('experimental-webgl', params);
 
+    //find out if our current webgl context supports certain features 
     let halfFloat;
     let supportLinearFiltering;
     if (isWebGL2) {
@@ -140,7 +144,7 @@ function getWebGLContext (canvas) {
     let formatRG;
     let formatR;
 
-    if (isWebGL2)
+    if (isWebGL2)//believe this is standardizing texture pixel format (aliases) based on webgl version
     {
         formatRGBA = getSupportedFormat(gl, gl.RGBA16F, gl.RGBA, halfFloatTexType);
         formatRG = getSupportedFormat(gl, gl.RG16F, gl.RG, halfFloatTexType);
@@ -153,6 +157,7 @@ function getWebGLContext (canvas) {
         formatR = getSupportedFormat(gl, gl.RGBA, gl.RGBA, halfFloatTexType);
     }
 
+    //ga() is for sending data to Google Analytics 
     ga('send', 'event', isWebGL2 ? 'webgl2' : 'webgl', formatRGBA == null ? 'not supported' : 'supported');
 
     return {
@@ -188,6 +193,13 @@ function getSupportedFormat (gl, internalFormat, format, type)
     }
 }
 
+//test case to check that the correct pixel types are supported 
+//setup a gl texture
+//set the texture params 
+//create a 2d image tex
+//create a frame buffer and bind the texture to it 
+//check tosee if the buffer object correctly accepcted texture 
+//TODO - enhance understanding of texture setup 
 function supportRenderTextureFormat (gl, internalFormat, format, type) {
     let texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -206,6 +218,7 @@ function supportRenderTextureFormat (gl, internalFormat, format, type) {
 }
 
 function startGUI () {
+    //dat is a library developed by Googles Data Team for building JS interfaces. Needs to be included in project directory 
     var gui = new dat.GUI({ width: 300 });
     gui.add(config, 'DYE_RESOLUTION', { 'high': 1024, 'medium': 512, 'low': 256, 'very low': 128 }).name('quality').onFinishChange(initFramebuffers);
     gui.add(config, 'SIM_RESOLUTION', { '32': 32, '64': 64, '128': 128, '256': 256 }).name('sim resolution').onFinishChange(initFramebuffers);
@@ -246,6 +259,7 @@ function startGUI () {
     github.domElement.parentElement.appendChild(githubIcon);
     githubIcon.className = 'icon github';
 
+    //can create a function to assign to a button
     let twitter = gui.add({ fun : () => {
         ga('send', 'event', 'link button', 'twitter');
         window.open('https://twitter.com/PavelDoGreat');
@@ -280,32 +294,41 @@ function startGUI () {
         gui.close();
 }
 
+//TODO - dont understand the alchemy here 
 function isMobile () {
     return /Mobi|Android/i.test(navigator.userAgent);
 }
 
+
 function captureScreenshot () {
     let res = getResolution(config.CAPTURE_RESOLUTION);
+    //use helper fxn to create frame buffer to render for screenshot 
     let target = createFBO(res.width, res.height, ext.formatRGBA.internalFormat, ext.formatRGBA.format, ext.halfFloatTexType, gl.NEAREST);
     render(target);
 
+    //create a texture from the frame buffer 
     let texture = framebufferToTexture(target);
     texture = normalizeTexture(texture, target.width, target.height);
 
     let captureCanvas = textureToCanvas(texture, target.width, target.height);
     let datauri = captureCanvas.toDataURL();
+    //use helper fxn to download data 
     downloadURI('fluid.png', datauri);
+    //tell browser we can forget about this url
     URL.revokeObjectURL(datauri);
 }
 
 function framebufferToTexture (target) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
-    let length = target.width * target.height * 4;
+    let length = target.width * target.height * 4; //take length time width, and multiply by 4 since we have 4 channels (rgba)
     let texture = new Float32Array(length);
+    //webgl fxn that will read pixels into a textue (texture type needs to match passed pixel data type, eg gl.FLOAT and Float32Array)
     gl.readPixels(0, 0, target.width, target.height, gl.RGBA, gl.FLOAT, texture);
     return texture;
 }
 
+
+//helper to rerange to integer values on [0,255] and return array of unsigned ints 
 function normalizeTexture (texture, width, height) {
     let result = new Uint8Array(texture.length);
     let id = 0;
@@ -331,14 +354,20 @@ function textureToCanvas (texture, width, height) {
     let ctx = captureCanvas.getContext('2d');
     captureCanvas.width = width;
     captureCanvas.height = height;
-
+    //createImageData comes from the canvas 2d api
     let imageData = ctx.createImageData(width, height);
+    //set data with our texture 
     imageData.data.set(texture);
+    //render texture to canvas
     ctx.putImageData(imageData, 0, 0);
 
     return captureCanvas;
 }
 
+//helper function that creates a temp element on our site 
+//this element is populated with a download link from HTMLCanvasElement.toDataURL()
+//and then is virtually clicked, initiating download 
+//then the link is removed
 function downloadURI (filename, uri) {
     let link = document.createElement('a');
     link.download = filename;
@@ -407,9 +436,19 @@ function createProgram (vertexShader, fragmentShader) {
 
 function getUniforms (program) {
     let uniforms = [];
+    //get the number of active uniforms in our shader 
+    //this helps in optimization because most compilers will "know" to ignore uniforms that are not used to generate output
+    //for example, 
+    //uniform vec4 uBase; 
+    //vec4 color = vec4(0.) + uBase;
+    //color = vec4(1.0); //this line means the prior line (using uBase) is relevant, so compiler would ignore uBase assuming it is not used elsewhere
+    //getProgramParameter will return a lot of info depending on what you ask for in second arg 
     let uniformCount = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
+    //then we loop through and fill up our array 
     for (let i = 0; i < uniformCount; i++) {
+        //getActiveUniform will return size, type, name 
         let uniformName = gl.getActiveUniform(program, i).name;
+        //getUniformLocation returns location in GPU memory 
         uniforms[uniformName] = gl.getUniformLocation(program, uniformName);
     }
     return uniforms;
@@ -421,13 +460,14 @@ function compileShader (type, source, keywords) {
     const shader = gl.createShader(type);
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
-
+    //test to ensure compile worked 
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
         console.trace(gl.getShaderInfoLog(shader));
 
     return shader;
 };
 
+//used in advection shader to assign a keyword in the case that webgl does not natively support linear filtering 
 function addKeywords (source, keywords) {
     if (keywords == null) return source;
     let keywordsString = '';
@@ -437,6 +477,14 @@ function addKeywords (source, keywords) {
     return keywordsString + source;
 }
 
+
+//shader defintion 
+//shaders are defined inline using the compile shader fxn and passing the shader code as a string
+
+//vertex shader 
+//compute the current pixels uv by using vertex position 
+//also compute our neighbors for easy calculations later 
+//texelsize = 1/resolution 
 const baseVertexShader = compileShader(gl.VERTEX_SHADER, `
     precision highp float;
 
@@ -458,6 +506,8 @@ const baseVertexShader = compileShader(gl.VERTEX_SHADER, `
     }
 `);
 
+//create a vertex shader with blurred coordiates for neighbors 
+//just horizontal blur
 const blurVertexShader = compileShader(gl.VERTEX_SHADER, `
     precision highp float;
 
@@ -476,6 +526,8 @@ const blurVertexShader = compileShader(gl.VERTEX_SHADER, `
     }
 `);
 
+
+//TODO - seems like this should be updated to a gaussian blur or something 
 const blurShader = compileShader(gl.FRAGMENT_SHADER, `
     precision mediump float;
     precision mediump sampler2D;
@@ -743,6 +795,7 @@ const splatShader = compileShader(gl.FRAGMENT_SHADER, `
     }
 `);
 
+//here we use keywords to define whether we need to use manual filtering for advection 
 const advectionShader = compileShader(gl.FRAGMENT_SHADER, `
     precision highp float;
     precision highp sampler2D;
@@ -780,7 +833,7 @@ const advectionShader = compileShader(gl.FRAGMENT_SHADER, `
         float decay = 1.0 + dissipation * dt;
         gl_FragColor = result / decay;
     }`,
-    ext.supportLinearFiltering ? null : ['MANUAL_FILTERING']
+    ext.supportLinearFiltering ? null : ['MANUAL_FILTERING'] //keyword assignment 
 );
 
 const divergenceShader = compileShader(gl.FRAGMENT_SHADER, `
@@ -912,14 +965,32 @@ const gradientSubtractShader = compileShader(gl.FRAGMENT_SHADER, `
     }
 `);
 
+//Creating a simple mesh for rendering, using two triangles (ie subdivide canvas with diagonal line from (-1,-1) to (1,1))
+//we need 4 vertices 0,1,2,3
+//and each vertex gets 2 attributes which is their position in x,y space 
+//assign these positions to the corners of our canvas
 const blit = (() => {
     gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    //create an array of attributes for our vertices
+    //two numbers per vertex, for x and y coordinates 
+    //(-1,1) -> bottom left
+    //(-1,1) -> top left 
+    //(1,1,) -> top right
+    //(1,-1) -> bottom right
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, -1, 1, 1, 1, 1, -1]), gl.STATIC_DRAW);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer());
+    //think this is numbering our vertices and grouping them
+    //one triangle with vertices numbered 0,1,2
+    //one trianlge with vertices numbered 0,2,3
+    //ie triangles one and two both share vertices 0, 2 and each have a unique vertex (vtx 1 and 3 respectivey)
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array([0, 1, 2, 0, 2, 3]), gl.STATIC_DRAW);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(0);
 
+    //intended to be used with output from createFBO
+    //if we dont pass a target, then we want to create a viewport with the overall dimensions 
+    //otherwise we can take our target dimensions (means we dont have to worry about sim res vs output res here)
+    //clear = false is a keyword arguement set to "false" by default 
     return (target, clear = false) => {
         if (target == null)
         {
@@ -937,6 +1008,13 @@ const blit = (() => {
             gl.clear(gl.COLOR_BUFFER_BIT);
         }
         // CHECK_FRAMEBUFFER_STATUS();
+        
+        
+        //do the actual drawing 
+        //here we will use a triangle mesh 
+        //draw 6 triangles 
+        //unsigned short is the type of our vertex data 
+        //offest is 0
         gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
     }
 })();
@@ -946,6 +1024,8 @@ function CHECK_FRAMEBUFFER_STATUS () {
     if (status != gl.FRAMEBUFFER_COMPLETE)
         console.trace("Framebuffer error: " + status);
 }
+
+//actual simulation construction
 
 let dye;
 let velocity;
@@ -957,8 +1037,11 @@ let bloomFramebuffers = [];
 let sunrays;
 let sunraysTemp;
 
+//load texture for dithering
 let ditheringTexture = createTextureAsync('LDR_LLL1_0.png');
 
+
+//create all our shader programs 
 const blurProgram            = new Program(blurVertexShader, blurShader);
 const copyProgram            = new Program(baseVertexShader, copyShader);
 const clearProgram           = new Program(baseVertexShader, clearShader);
@@ -977,13 +1060,17 @@ const vorticityProgram       = new Program(baseVertexShader, vorticityShader);
 const pressureProgram        = new Program(baseVertexShader, pressureShader);
 const gradienSubtractProgram = new Program(baseVertexShader, gradientSubtractShader);
 
+
+//create a material from our display shader source to capitalize on the #defines for optimization 
+//TODO - do we have to compile this source differently since there are the defines? 
+//this also allows us to only use the active uniforms 
 const displayMaterial = new Material(baseVertexShader, displayShaderSource);
 
 function initFramebuffers () {
-    let simRes = getResolution(config.SIM_RESOLUTION);
-    let dyeRes = getResolution(config.DYE_RESOLUTION);
+    let simRes = getResolution(config.SIM_RESOLUTION);//getResolution basically just applies view aspect ratio to the passed resolution 
+    let dyeRes = getResolution(config.DYE_RESOLUTION);//getResolution basically just applies view aspect ratio to the passed resolution 
 
-    const texType = ext.halfFloatTexType;
+    const texType = ext.halfFloatTexType; //TODO - should be 32 bit floats? 
     const rgba    = ext.formatRGBA;
     const rg      = ext.formatRG;
     const r       = ext.formatR;
@@ -991,20 +1078,24 @@ function initFramebuffers () {
 
     gl.disable(gl.BLEND);
 
+    //use helper function to create pairs of buffer objects that will be ping pong'd for our sim 
+    //this lets us define the buffer objects that we wil want to use for feedback 
     if (dye == null)
         dye = createDoubleFBO(dyeRes.width, dyeRes.height, rgba.internalFormat, rgba.format, texType, filtering);
-    else
+    else //resize if needed 
         dye = resizeDoubleFBO(dye, dyeRes.width, dyeRes.height, rgba.internalFormat, rgba.format, texType, filtering);
 
     if (velocity == null)
         velocity = createDoubleFBO(simRes.width, simRes.height, rg.internalFormat, rg.format, texType, filtering);
-    else
+    else //resize if needed 
         velocity = resizeDoubleFBO(velocity, simRes.width, simRes.height, rg.internalFormat, rg.format, texType, filtering);
-
+    //other buffer objects that dont need feedback / ping-pong 
+    //notice the filtering type is set to gl.NEAREST meaning we grab just a single px, no filtering 
     divergence = createFBO      (simRes.width, simRes.height, r.internalFormat, r.format, texType, gl.NEAREST);
     curl       = createFBO      (simRes.width, simRes.height, r.internalFormat, r.format, texType, gl.NEAREST);
     pressure   = createDoubleFBO(simRes.width, simRes.height, r.internalFormat, r.format, texType, gl.NEAREST);
 
+    //setup buffers for post process 
     initBloomFramebuffers();
     initSunraysFramebuffers();
 }
@@ -1021,6 +1112,10 @@ function initBloomFramebuffers () {
     bloomFramebuffers.length = 0;
     for (let i = 0; i < config.BLOOM_ITERATIONS; i++)
     {
+        //right shift resolution by iteration amount 
+        // ie we reduce the resolution by a factor of 2^i, or rightshift(x,y) -> x/pow(2,y)
+        // (1024 >> 1 = 512)
+        // so basically creating mipmaps
         let width = res.width >> (i + 1);
         let height = res.height >> (i + 1);
 
@@ -1056,7 +1151,7 @@ function createFBO (w, h, internalFormat, format, type, param) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
     gl.viewport(0, 0, w, h);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.clear(gl.COLOR_BUFFER_BIT); //can also clear depth or stencil buffers 
 
     let texelSizeX = 1.0 / w;
     let texelSizeY = 1.0 / h;
@@ -1068,7 +1163,7 @@ function createFBO (w, h, internalFormat, format, type, param) {
         height: h,
         texelSizeX,
         texelSizeY,
-        attach (id) {
+        attach (id) { //assigns textures to entries in the txture buffer array (like sTD2DInputs[...])
             gl.activeTexture(gl.TEXTURE0 + id);
             gl.bindTexture(gl.TEXTURE_2D, texture);
             return id;
@@ -1165,6 +1260,8 @@ function updateKeywords () {
     displayMaterial.setKeywords(displayKeywords);
 }
 
+
+//actually calling our functions to make program work 
 updateKeywords();
 initFramebuffers();
 multipleSplats(parseInt(Math.random() * 20) + 5);
@@ -1173,14 +1270,17 @@ let lastUpdateTime = Date.now();
 let colorUpdateTimer = 0.0;
 update();
 
+
+//simulation step 
 function update () {
+    //time step 
     const dt = calcDeltaTime();
-    if (resizeCanvas())
+    if (resizeCanvas()) //resize if needed 
         initFramebuffers();
-    updateColors(dt);
-    applyInputs();
+    updateColors(dt); //step through our sim 
+    applyInputs(); //take from ui
     if (!config.PAUSED)
-        step(dt);
+        step(dt); //do a calculation step 
     render(null);
     requestAnimationFrame(update);
 }
@@ -1188,7 +1288,7 @@ function update () {
 function calcDeltaTime () {
     let now = Date.now();
     let dt = (now - lastUpdateTime) / 1000;
-    dt = Math.min(dt, 0.016666);
+    dt = Math.min(dt, 0.016666); //never want to update slower than 60fps
     lastUpdateTime = now;
     return dt;
 }
@@ -1204,7 +1304,7 @@ function resizeCanvas () {
     return false;
 }
 
-function updateColors (dt) {
+function updateColors (dt) {//used to update the color map for each pointer, which happens slower than the entire sim updates 
     if (!config.COLORFUL) return;
 
     colorUpdateTimer += dt * config.COLOR_UPDATE_SPEED;
@@ -1217,10 +1317,11 @@ function updateColors (dt) {
 }
 
 function applyInputs () {
-    if (splatStack.length > 0)
-        multipleSplats(splatStack.pop());
+    if (splatStack.length > 0) //if there are splats then recreate them
+        multipleSplats(splatStack.pop());//TODO - verify what elemetns of splatStack are and what splatStack.pop() will return (should be int??)
 
-    pointers.forEach(p => {
+
+    pointers.forEach(p => { //create a splat for our pointers 
         if (p.moved) {
             p.moved = false;
             splatPointer(p);
@@ -1228,6 +1329,8 @@ function applyInputs () {
     });
 }
 
+
+//the simulation, finally! 
 function step (dt) {
     gl.disable(gl.BLEND);
 
