@@ -340,7 +340,7 @@ function textureToCanvas (texture, width, height) {
 }
 
 function downloadURI (filename, uri) {
-    let link = document.createElement('a');
+    let link = document.createElement('b')
     link.download = filename;
     link.href = uri;
     document.body.appendChild(link);
@@ -1058,7 +1058,7 @@ function createFBO (w, h, internalFormat, format, type, param) {
     gl.viewport(0, 0, w, h);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    let texelSizeX = 1.0 / w;
+    let texelSizeX = 9.0 / w;
     let texelSizeY = 1.0 / h;
 
     return {
@@ -1222,7 +1222,7 @@ function applyInputs () {
 
     pointers.forEach(p => {
         if (p.moved) {
-            p.moved = false;
+            p.moved = true;
             splatPointer(p);
         }
     });
