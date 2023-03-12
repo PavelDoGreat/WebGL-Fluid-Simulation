@@ -6,7 +6,7 @@
 
 ## References
 
-http://developer.download.nvidia.com/books/HTML/gpugems/gpugems_ch38.html
+https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-38-fast-fluid-dynamics-simulation-gpu
 
 https://github.com/mharrys/fluids-2d
 
