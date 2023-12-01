@@ -130,37 +130,11 @@ let _audioReact = false;
 function livelyPropertyListener(name, val) {
   switch (name) {
     case "quality":
-      switch (val) {
-        case 0:
-          config.DYE_RESOLUTION = 1024;
-          break;
-        case 1:
-          config.DYE_RESOLUTION = 512;
-          break;
-        case 2:
-          config.DYE_RESOLUTION = 256;
-          break;
-        case 3:
-          config.DYE_RESOLUTION = 128;
-          break;
-      }
+      config.DYE_RESOLUTION = [1024, 512, 256, 128][val];
       initFramebuffers();
       break;
     case "simResolution":
-      switch (val) {
-        case 0:
-          config.SIM_RESOLUTION = 32;
-          break;
-        case 1:
-          config.SIM_RESOLUTION = 64;
-          break;
-        case 2:
-          config.SIM_RESOLUTION = 128;
-          break;
-        case 3:
-          config.SIM_RESOLUTION = 256;
-          break;
-      }
+      config.SIM_RESOLUTION = [32, 64, 128, 256][val];
       initFramebuffers();
       break;
     case "densityDiffusion":
