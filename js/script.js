@@ -67,13 +67,11 @@ function randomSplat()
         splatStack.push(parseInt(Math.random() * 20) + 5);
 }
 
-//lively is minimizing browser window to pause.
-//this wont obviously work once I implement proper pause -> todo:- do not call livelyAudioListener() when paused/minimized.
-document.addEventListener("visibilitychange", function() {
-  //alert(document.hidden+ " "+document.visibilityState);
-  _isSleep = document.hidden;
-
-}, false);
+function livelyWallpaperPlaybackChanged(data)
+{
+ var obj = JSON.parse(data);
+ _isSleep = obj.IsPaused;
+}
 
 let timeout;
 let timeoutBool=true;

@@ -7,6 +7,7 @@
   "Author": "PavelDoGreat",
   "License": "MIT",
   "Contact": "https://github.com/rocksdanister/WebGL-Fluid-Simulation",
-  "Type": 2,
+  "Type": 1,
+  "Arguments": "--audio --pause-event true",
   "FileName": "fluid.html"
 }
