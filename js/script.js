@@ -127,8 +127,6 @@ function generateColor() {
 
 let _randomSplats = false;
 let _audioReact = false;
-let _bgImageChk = false;
-let _bgImagePath = "";
 function livelyPropertyListener(name, val) {
   switch (name) {
     case "quality":
@@ -211,17 +209,10 @@ function livelyPropertyListener(name, val) {
       config.BACK_COLOR.b = tmp.b;
       break;
     case "bgImgChk":
-      _bgImageChk = val;
       config.TRANSPARENT = val;
-      if (_bgImageChk) {
-        document.body.style.backgroundImage = "url(" + _bgImagePath.replace("\\", "/") + ")";
-      }
       break;
     case "imgSelect":
-      _bgImagePath = val;
-      if (_bgImageChk) {
-        document.body.style.backgroundImage = "url(" + val.replace("\\", "/") + ")";
-      }
+      if (val != null) document.body.style.backgroundImage = "url('" + val.replace("\\", "/") + "')";
       break;
     case "randomSplats":
       _randomSplats = val;
