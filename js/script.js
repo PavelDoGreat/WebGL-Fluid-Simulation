@@ -186,7 +186,7 @@ function livelyPropertyListener(name, val) {
       config.TRANSPARENT = val;
       break;
     case "imgSelect":
-      if (val != null) document.body.style.backgroundImage = "url('" + val.replace("\\", "/") + "')";
+      if (val != null) document.body.style.backgroundImage = `url('${val.replace("\\", "/")}')`;
       break;
     case "randomSplats":
       _randomSplats = val;
