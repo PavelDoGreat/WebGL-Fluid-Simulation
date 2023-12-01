@@ -1,5 +1,5 @@
 {
-  "AppVersion": "0.3.1.0",
+  "AppVersion": "2.0.7.4",
   "Title": "Fluids",
   "Thumbnail": "fluid.jpg",
   "Preview": "fluid_preview.gif",
@@ -9,5 +9,5 @@
   "Contact": "https://github.com/rocksdanister/WebGL-Fluid-Simulation",
   "Type": 1,
   "Arguments": "--audio --pause-event true",
-  "FileName": "fluid.html"
+  "FileName": "index.html"
 }
