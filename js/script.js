@@ -127,7 +127,9 @@ function generateColor() {
 
 let _randomSplats = false;
 let _audioReact = false;
-let colorRange=[-1,-1];
+let colorRange=["#000000","#000000"];
+let splatRadiusModulationEnabled=false;
+let baseRadius=config.SPLAT_RADIUS;
 function livelyPropertyListener(name, val) {
   switch (name) {
     case "quality":
@@ -196,10 +198,10 @@ function livelyPropertyListener(name, val) {
       _audioReact = val;
       break;
     case "colorLeft":
-        colorRange[0]=val=="#000000"? -1: RGBtoHSV(hexToRgb(val)).h;
+        colorRange[0]=val;
         break;
     case "colorRight":
-        colorRange[1]=val=="#000000"? -1: RGBtoHSV(hexToRgb(val)).h;
+        colorRange[1]=val;
         break;
   }
 }
@@ -1680,23 +1682,27 @@ function correctDeltaY(delta) {
 }
 
 function generateColor() {
-  let c,l=colorRange[0],r=colorRange[1];
-  if(l!=-1&&r!=-1){
-      if(r<l){
-          r+=1
-      }
-      c=Math.random()*(r-l)+l;
-      if(c>1){
-          c-=1;
-      }
+  let c;
+  if(colorRange[0]!="#000000"||colorRange[1]!="#000000"){
+    let l=RGBtoHSV(hexToRgb(colorRange[0])),r=RGBtoHSV(hexToRgb(colorRange[1])),x;
+    if(r.s<l.s){
+      x=r.s; r.s=l.s; l.s=x;
+    }
+    if(r.v<l.v){
+      x=r.v; r.v=l.v; l.v=x;
+    }
+    if(r.h<l.h){
+      r.h+=1;
+    }
+    x=Math.random()*(r.h-l.h)+l.h;
+    if(x>1){
+      x-=1;
+    }
+    c=HSVtoRGB(x,Math.random()*(r.s-l.s)+l.s,(Math.random()*(r.v-l.v)+l.v)*0.15);
   }
   else{
-      c=Math.random();
+    c = HSVtoRGB(Math.random(), 1, 0.15);
   }
-  c = HSVtoRGB(c, 1.0, 1.0);
-  c.r *= 0.15;
-  c.g *= 0.15;
-  c.b *= 0.15;
   return c;
 }
 
