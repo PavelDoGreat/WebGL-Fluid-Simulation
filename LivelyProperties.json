@@ -131,5 +131,15 @@
     "type": "checkbox",
     "value": false,
     "text": "Background"
-  }
+  },
+  "colorLeft": {
+    "text": "color left",
+    "type": "color",
+    "value": "#000000"
+  },
+  "colorRight": {
+    "text": "color right",
+    "type": "color",
+    "value": "#000000"
+  },
 }
