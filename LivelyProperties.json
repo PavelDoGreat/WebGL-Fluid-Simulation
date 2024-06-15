@@ -74,12 +74,12 @@
   "colorLeft": {
     "text": "color left",
     "type": "color",
-    "value": "#000000"
+    "value": "#FF0000"
   },
   "colorRight": {
     "text": "color right",
     "type": "color",
-    "value": "#000000"
+    "value": "#FF0001"
   },
   "colorConfig2":{
     "text":"color (advanced config)",
