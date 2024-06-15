@@ -71,38 +71,6 @@
     "type": "slider",
     "value": 20
   },
-  "splatRadiusModulationEnabled": {
-    "type": "checkbox",
-    "value": false,
-    "text": "Size Scaling"
-  },
-  "splatCircleEnabled": {
-    "type": "checkbox",
-    "value": false,
-    "text": "Splat Circle"
-  },
-  "splatVelocity": {
-    "max": 60,
-    "min": 0,
-    "text": "Splat Velocity",
-    "type": "slider",
-    "value": 10
-  },
-  "colorLeft": {
-    "text": "color left",
-    "type": "color",
-    "value": "#000000"
-  },
-  "colorRight": {
-    "text": "color right",
-    "type": "color",
-    "value": "#000000"
-  },
-  "colorConfig2":{
-    "text":"color (advanced config)",
-    "type": "textbox",
-    "value": "",
-  },
   "shading": {
     "type": "checkbox",
     "value": true,
