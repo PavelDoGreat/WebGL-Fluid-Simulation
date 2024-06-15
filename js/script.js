@@ -128,6 +128,7 @@ function generateColor() {
 let _randomSplats = false;
 let _audioReact = false;
 let colorRange=["#000000","#000000"];
+let colorConfig=null;
 let splatRadiusModulationEnabled=false;
 let baseRadius=config.SPLAT_RADIUS;
 function livelyPropertyListener(name, val) {
@@ -202,6 +203,9 @@ function livelyPropertyListener(name, val) {
         break;
     case "colorRight":
         colorRange[1]=val;
+        break;
+    case "colorConfig2":
+        colorConfig=val===""? null:JSON.parse(val);
         break;
   }
 }
@@ -1683,25 +1687,44 @@ function correctDeltaY(delta) {
 
 function generateColor() {
   let c;
-  if(colorRange[0]!="#000000"||colorRange[1]!="#000000"){
-    let l=RGBtoHSV(hexToRgb(colorRange[0])),r=RGBtoHSV(hexToRgb(colorRange[1])),x;
-    if(r.s<l.s){
-      x=r.s; r.s=l.s; l.s=x;
+  let [colorLeft,colorRight]=colorRange;
+  try {
+    if(colorConfig!==null){
+        const probabilityTotal=colorConfig.reduce((sum,c)=>sum+c[0],0);
+        let rand=Math.random()*probabilityTotal;
+        for(const c of colorConfig){
+        rand-=c[0];
+        if(rand<0){
+            colorLeft=c[1];
+            colorRight=c[2];
+            break;
+        }
+        }
     }
-    if(r.v<l.v){
-      x=r.v; r.v=l.v; l.v=x;
+    if(colorLeft!="#000000"||colorRight!="#000000"){
+        let l=RGBtoHSV(hexToRgb(colorLeft)),r=RGBtoHSV(hexToRgb(colorRight)),x;
+        if(r.s<l.s){
+        x=r.s; r.s=l.s; l.s=x;
+        }
+        if(r.v<l.v){
+        x=r.v; r.v=l.v; l.v=x;
+        }
+        if(r.h<l.h){
+        r.h+=1;
+        }
+        x=Math.random()*(r.h-l.h)+l.h;
+        if(x>1){
+        x-=1;
+        }
+        c=HSVtoRGB(x,Math.random()*(r.s-l.s)+l.s,(Math.random()*(r.v-l.v)+l.v)*0.15);
     }
-    if(r.h<l.h){
-      r.h+=1;
+    else{
+        c = HSVtoRGB(Math.random(), 1, 0.15);
     }
-    x=Math.random()*(r.h-l.h)+l.h;
-    if(x>1){
-      x-=1;
-    }
-    c=HSVtoRGB(x,Math.random()*(r.s-l.s)+l.s,(Math.random()*(r.v-l.v)+l.v)*0.15);
-  }
-  else{
-    c = HSVtoRGB(Math.random(), 1, 0.15);
+  
+  } catch (error) {
+    console.log("Invalid color config",error);
+    c = hexToRgb("#000000");
   }
   return c;
 }
