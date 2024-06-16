@@ -81,11 +81,6 @@
     "type": "color",
     "value": "#FF0001"
   },
-  "colorConfig2":{
-    "text":"color (advanced config)",
-    "type": "textbox",
-    "value": "",
-  },
   "shading": {
     "type": "checkbox",
     "value": true,
