@@ -117,16 +117,12 @@ function multipleSplats(amount) {
   }
 }
 
-function generateColor() {
-  let c = HSVtoRGB(Math.random(), 1.0, 1.0);
-  c.r *= 0.15;
-  c.g *= 0.15;
-  c.b *= 0.15;
-  return c;
-}
-
 let _randomSplats = false;
 let _audioReact = false;
+let colorRange=["#FF0000","#FF0001"];
+let colorConfig=null;
+let splatRadiusModulationEnabled=false;
+let baseRadius=config.SPLAT_RADIUS;
 function livelyPropertyListener(name, val) {
   switch (name) {
     case "quality":
@@ -194,6 +190,15 @@ function livelyPropertyListener(name, val) {
     case "audioReact":
       _audioReact = val;
       break;
+    case "colorLeft":
+        colorRange[0]=val;
+        break;
+    case "colorRight":
+        colorRange[1]=val;
+        break;
+    case "colorConfig2":
+        colorConfig=val===""? null:JSON.parse(val);
+        break;
   }
 }
 
@@ -206,6 +211,29 @@ function hexToRgb(hex) {
         b: parseInt(result[3], 16),
       }
     : null;
+}
+function RGBtoHSV(r, g, b) {
+    if (arguments.length === 1) {
+        g = r.g, b = r.b, r = r.r;
+    }
+    var max = Math.max(r, g, b), min = Math.min(r, g, b),
+        d = max - min,
+        h,
+        s = (max === 0 ? 0 : d / max),
+        v = max / 255;
+
+    switch (max) {
+        case min: h = 0; break;
+        case r: h = (g - b) + d * (g < b ? 6: 0); h /= 6 * d; break;
+        case g: h = (b - r) + d * 2; h /= 6 * d; break;
+        case b: h = (r - g) + d * 4; h /= 6 * d; break;
+    }
+
+    return {
+        h: h,
+        s: s,
+        v: v
+    };
 }
 
 function pointerPrototype() {
@@ -1650,10 +1678,40 @@ function correctDeltaY(delta) {
 }
 
 function generateColor() {
-  let c = HSVtoRGB(Math.random(), 1.0, 1.0);
-  c.r *= 0.15;
-  c.g *= 0.15;
-  c.b *= 0.15;
+  let c;
+  let [colorLeft,colorRight]=colorRange;
+  try {
+    if(colorConfig!==null){
+        const probabilityTotal=colorConfig.reduce((sum,c)=>sum+c[0],0);
+        let rand=Math.random()*probabilityTotal;
+        for(const c of colorConfig){
+        rand-=c[0];
+        if(rand<0){
+            colorLeft=c[1];
+            colorRight=c[2];
+            break;
+        }
+        }
+    }
+    let l=RGBtoHSV(hexToRgb(colorLeft)),r=RGBtoHSV(hexToRgb(colorRight)),x;
+    if(r.s<l.s){
+    x=r.s; r.s=l.s; l.s=x;
+    }
+    if(r.v<l.v){
+    x=r.v; r.v=l.v; l.v=x;
+    }
+    if(r.h<l.h){
+    r.h+=1;
+    }
+    x=Math.random()*(r.h-l.h)+l.h;
+    if(x>1){
+    x-=1;
+    }
+    c=HSVtoRGB(x,Math.random()*(r.s-l.s)+l.s,(Math.random()*(r.v-l.v)+l.v)*0.15);
+  } catch (error) {
+    console.log("Invalid color config",error);
+    c = hexToRgb("#000000");
+  }
   return c;
 }
 

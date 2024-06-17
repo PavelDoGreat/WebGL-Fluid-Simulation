@@ -71,6 +71,16 @@
     "type": "slider",
     "value": 20
   },
+  "colorLeft": {
+    "text": "color left",
+    "type": "color",
+    "value": "#FF0000"
+  },
+  "colorRight": {
+    "text": "color right",
+    "type": "color",
+    "value": "#FF0001"
+  },
   "shading": {
     "type": "checkbox",
     "value": true,
@@ -131,5 +141,5 @@
     "type": "checkbox",
     "value": false,
     "text": "Background"
-  }
+  },
 }
