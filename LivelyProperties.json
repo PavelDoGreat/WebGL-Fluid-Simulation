@@ -1,13 +1,21 @@
 {
+  "label0": {
+    "type": "label",
+    "value": "Audio"
+  },
   "audioReact": {
     "type": "checkbox",
     "value": true,
-    "text": "Audio Visualiser"
+    "text": "Visualiser"
   },
   "randomSplats": {
     "type": "checkbox",
     "value": false,
     "text": "Random Splats"
+  },
+  "label1": {
+    "type": "label",
+    "value": "Performance"
   },
   "quality": {
     "type": "dropdown",
@@ -30,6 +38,29 @@
       "128",
       "256"
     ]
+  },
+  "label2": {
+    "type": "label",
+    "value": "Color"
+  },
+  "colorLeft": {
+    "text": "Left",
+    "type": "color",
+    "value": "#FF0000"
+  },
+  "colorRight": {
+    "text": "Right",
+    "type": "color",
+    "value": "#FFFF00"
+  },
+  "customColor": {
+    "type": "checkbox",
+    "value": false,
+    "text": "Enable"
+  },
+  "label3": {
+    "type": "label",
+    "value": "Simulation"
   },
   "densityDiffusion": {
     "max": 40,
@@ -70,16 +101,6 @@
     "text": "Splat Radius",
     "type": "slider",
     "value": 20
-  },
-  "colorLeft": {
-    "text": "color left",
-    "type": "color",
-    "value": "#FF0000"
-  },
-  "colorRight": {
-    "text": "color right",
-    "type": "color",
-    "value": "#FF0001"
   },
   "shading": {
     "type": "checkbox",
@@ -125,21 +146,59 @@
     "type": "slider",
     "value": 40
   },
-  "bgColor": {
-    "text": "BG Color",
+  "label4": {
+    "type": "label",
+    "value": "Background"
+  },
+  "backgroundColor": {
+    "text": "Color",
     "type": "color",
     "value": "#000000"
   },
-  "imgSelect": {
+  "backgroundSrc": {
     "type": "folderDropdown",
     "value": "pexels-neosiam-601798.jpg",
-    "text": "Image",
-    "filter": "*.jpg|*.png",
+    "text": "Image/WebM Video",
+    "filter": "*.jpg|*.jpeg|*.webp|*.png|*.webm",
     "folder": "wallpapers"
   },
-  "bgImgChk": {
+  "backgroundFit": {
+    "type": "dropdown",
+    "value": 2,
+    "text": "Choose a Fit",
+    "items": [
+      "Contain",
+      "Cover",
+      "Fill",
+      "None"
+    ]
+  },
+  "backgroundEnabled": {
     "type": "checkbox",
     "value": false,
-    "text": "Background"
+    "text": "Enable"
   },
+  "label5": {
+    "type": "label",
+    "value": "Overlay"
+  },
+  "overlaySrc": {
+    "type": "folderDropdown",
+    "value": "icon-lively-300.png",
+    "text": "Image",
+    "filter": "*.jpg|*.jpeg|*.webp|*.png|*.svg",
+    "folder": "overlays"
+  },
+  "overlaySize": {
+    "max": 100,
+    "min": 5,
+    "text": "Size",
+    "type": "slider",
+    "value": 25
+  },
+  "overlayEnabled": {
+    "type": "checkbox",
+    "value": false,
+    "text": "Enable"
+  }
 }

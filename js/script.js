@@ -56,6 +56,7 @@ let config = {
   SOUND_SENSITIVITY: 0.25,
   FREQ_RANGE: 40,
   FREQ_MULTI: 0.1,
+  CUSTOM_COLOR: false
 };
 
 var timer = setInterval(randomSplat, 3500);
@@ -119,10 +120,12 @@ function multipleSplats(amount) {
 
 let _randomSplats = false;
 let _audioReact = false;
-let colorRange=["#FF0000","#FF0001"];
-let colorConfig=null;
-let splatRadiusModulationEnabled=false;
-let baseRadius=config.SPLAT_RADIUS;
+let colorRange = ["#FF0000","#FF0001"];
+let colorConfig = null;
+let splatRadiusModulationEnabled = false;
+let baseRadius = config.SPLAT_RADIUS;
+let backgroundSrc = null;
+let isBackground = false;
 function livelyPropertyListener(name, val) {
   switch (name) {
     case "quality":
@@ -172,18 +175,39 @@ function livelyPropertyListener(name, val) {
     case "sunRaysWeight":
       config.SUNRAYS_WEIGHT = val / 100;
       break;
-    case "bgColor":
-      const tmp = hexToRgb(val);
-      config.BACK_COLOR.r = tmp.r;
-      config.BACK_COLOR.g = tmp.g;
-      config.BACK_COLOR.b = tmp.b;
+    case "backgroundColor":
+      setBackgroundColor(val);
       break;
-    case "bgImgChk":
-      config.TRANSPARENT = val;
+    case "backgroundSrc":
+      backgroundSrc = val;
+      if (isBackground)
+        setBackground(val);
       break;
-    case "imgSelect":
-      if (val != null) document.body.style.backgroundImage = `url('${val.replace("\\", "/")}')`;
+    case "backgroundFit":
+      setBackgroundFit(val);
       break;
+    case "backgroundEnabled":
+      isBackground = val;
+      if (isBackground)
+      {
+        config.TRANSPARENT = true;
+        setBackground(backgroundSrc);
+      }
+      else
+      {
+        config.TRANSPARENT = false;
+        disposeBackgrounds();
+      }
+      break;
+    case "overlaySrc":
+      setOverlay(val);
+      break;
+    case "overlaySize":
+      setOverlaySize(val);
+      break;
+    case "overlayEnabled":
+      toggleOverlay(val);
+      break;    
     case "randomSplats":
       _randomSplats = val;
       break;
@@ -196,10 +220,81 @@ function livelyPropertyListener(name, val) {
     case "colorRight":
         colorRange[1]=val;
         break;
-    case "colorConfig2":
-        colorConfig=val===""? null:JSON.parse(val);
-        break;
+    case "customColor":
+        config.CUSTOM_COLOR = val;
+        break;    
+    // case "colorConfig2":
+    //     colorConfig=val===""? null:JSON.parse(val);
+    //     break;
   }
+}
+
+function setBackgroundColor(hex)
+{
+  const tmp = hexToRgb(hex);
+  config.BACK_COLOR.r = tmp.r;
+  config.BACK_COLOR.g = tmp.g;
+  config.BACK_COLOR.b = tmp.b;
+  document.body.style.backgroundColor = hex;
+}
+
+function setOverlay(srcPath)
+{
+  if (srcPath == undefined || srcPath == null ) 
+    return;
+
+  let src = srcPath.replace("\\", "/");
+  document.getElementById('overlay').style.backgroundImage = `url('${src}')`;
+}
+
+function setOverlaySize(size)
+{
+  let overlay = document.getElementById('overlay');
+  overlay.style.width = `${size}%`;
+  overlay.style.height = `${size}%`;
+}
+
+function toggleOverlay(val)
+{
+  document.getElementById('overlay').style.visibility = !val ? "hidden" : "visible";
+}
+
+function setBackground(srcPath)
+{
+  if (srcPath == undefined || srcPath == null ) 
+    return;
+
+  let ext = getExtension(srcPath);
+  let src = srcPath.replace("\\", "/");
+  let videoElement = document.getElementById('videoBackground');
+
+  if (ext == "jpg" || ext == "jpeg" || ext == "png" || ext == "webp")
+  {
+    disposeVideoElement(videoElement);
+    document.body.style.backgroundImage = `url('${src}')`;
+  }
+  else if (ext == "webm")
+  {
+    document.body.style.backgroundImage = '';
+    videoElement.src = src;
+    videoElement.play();
+  }
+}
+
+function disposeBackgrounds()
+{
+  document.body.style.backgroundImage = '';
+  disposeVideoElement(document.getElementById('videoBackground'));
+}
+
+function setBackgroundFit(index)
+{
+  document.getElementById('videoBackground').style.objectFit = ["contain", "cover", "fill", "none"][index];
+  document.body.style.backgroundSize = ["contain", "cover", "100% 100%", "auto"][index];
+}
+
+function getExtension(filePath) {
+  return filePath.substring(filePath.lastIndexOf(".") + 1, filePath.length) || filePath;
 }
 
 function hexToRgb(hex) {
@@ -212,6 +307,16 @@ function hexToRgb(hex) {
       }
     : null;
 }
+
+//ref: https://stackoverflow.com/questions/3258587/how-to-properly-unload-destroy-a-video-element
+function disposeVideoElement(element) {
+  if (element != null && element.hasAttribute("src")) {
+    element.pause();
+    element.removeAttribute("src"); // empty source
+    element.load();
+  }
+}
+
 function RGBtoHSV(r, g, b) {
     if (arguments.length === 1) {
         g = r.g, b = r.b, r = r.r;
@@ -1678,39 +1783,53 @@ function correctDeltaY(delta) {
 }
 
 function generateColor() {
-  let c;
-  let [colorLeft,colorRight]=colorRange;
-  try {
-    if(colorConfig!==null){
-        const probabilityTotal=colorConfig.reduce((sum,c)=>sum+c[0],0);
-        let rand=Math.random()*probabilityTotal;
+  let c = HSVtoRGB(Math.random(), 1.0, 1.0);
+  if (!config.CUSTOM_COLOR)
+  {
+    c.r *= 0.15;
+    c.g *= 0.15;
+    c.b *= 0.15;
+  }
+  else
+  {
+    let [colorLeft,colorRight]=colorRange;
+    try {
+      if(colorConfig!==null){
+        const probabilityTotal = colorConfig.reduce((sum,c)=>sum+c[0],0);
+        let rand = Math.random()*probabilityTotal;
         for(const c of colorConfig){
-        rand-=c[0];
-        if(rand<0){
-            colorLeft=c[1];
-            colorRight=c[2];
+          rand -= c[0];
+          if(rand<0){
+            colorLeft = c[1];
+            colorRight = c[2];
             break;
+          }
         }
-        }
+      }
+      let l = RGBtoHSV(hexToRgb(colorLeft)), r = RGBtoHSV(hexToRgb(colorRight)), x;
+      if(r.s < l.s){
+        x = r.s; 
+        r.s = l.s; 
+        l.s = x;
+      }
+      if(r.v < l.v){
+        x = r.v; 
+        r.v = l.v; 
+        l.v = x;
+      }
+      if(r.h < l.h){
+        r.h += 1;
+      }
+
+      x = Math.random()*(r.h-l.h) + l.h;
+      if(x>1){
+        x -= 1;
+      }
+      c = HSVtoRGB(x,Math.random()*(r.s-l.s)+l.s, (Math.random()*(r.v-l.v)+l.v)*0.15);
+    } catch (error) {
+      console.log("Invalid color config",error);
+      c = hexToRgb("#000000");
     }
-    let l=RGBtoHSV(hexToRgb(colorLeft)),r=RGBtoHSV(hexToRgb(colorRight)),x;
-    if(r.s<l.s){
-    x=r.s; r.s=l.s; l.s=x;
-    }
-    if(r.v<l.v){
-    x=r.v; r.v=l.v; l.v=x;
-    }
-    if(r.h<l.h){
-    r.h+=1;
-    }
-    x=Math.random()*(r.h-l.h)+l.h;
-    if(x>1){
-    x-=1;
-    }
-    c=HSVtoRGB(x,Math.random()*(r.s-l.s)+l.s,(Math.random()*(r.v-l.v)+l.v)*0.15);
-  } catch (error) {
-    console.log("Invalid color config",error);
-    c = hexToRgb("#000000");
   }
   return c;
 }
