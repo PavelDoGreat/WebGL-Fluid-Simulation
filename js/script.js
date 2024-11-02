@@ -69,6 +69,7 @@ function randomSplat() {
 function livelyWallpaperPlaybackChanged(data) {
   var obj = JSON.parse(data);
   _isSleep = obj.IsPaused;
+  pauseVideoBackground(obj.IsPaused);
 }
 
 let timeout;
@@ -257,6 +258,18 @@ function setOverlaySize(size)
 function toggleOverlay(val)
 {
   document.getElementById('overlay').style.visibility = !val ? "hidden" : "visible";
+}
+
+function pauseVideoBackground(isPaused)
+{
+  let videoElement = document.getElementById('videoBackground');
+  if (videoElement != null && videoElement.hasAttribute("src"))
+  {
+    if (isPaused)
+      videoElement.pause();
+    else
+      videoElement.play();
+  }
 }
 
 function setBackground(srcPath)
